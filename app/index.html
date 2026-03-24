@@ -3846,7 +3846,7 @@ async function savePDFExtraction() {
             imponibile: parseFloat(document.getElementById('pdf_imponibile').value) || null,
             imposte: parseFloat(document.getElementById('pdf_tasse').value) || 0,
             ssn: parseFloat(document.getElementById('pdf_ssn').value) || 0,
-            frazionamento: document.getElementById('pdf_frazionamento').value || 'Annuale',
+            frazionamento: (document.getElementById('pdf_frazionamento').value || 'annuale').toLowerCase(),
             stato: 'attiva',
             tacito_rinnovo: true,
             dettagli_ramo: Object.keys(dettagliRamo).length > 0 ? dettagliRamo : {},
