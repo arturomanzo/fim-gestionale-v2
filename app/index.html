@@ -3822,24 +3822,36 @@ async function savePDFExtraction() {
         // Get collaboratore
         var collabId = document.getElementById('pdf_collaboratore').value || null;
 
-        // Build polizza object for Supabase
+        // Build polizza object for Supabase (column names from migration schema)
+        var decorrenza = document.getElementById('pdf_decorrenza').value || null;
+        var scadenza = document.getElementById('pdf_scadenza').value || null;
+        var targa = document.getElementById('pdf_targa').value || null;
+        var veicolo = document.getElementById('pdf_veicolo').value || '';
+
+        // Build dettagli_ramo JSON for extra fields
+        var dettagliRamo = {};
+        if (targa) dettagliRamo.targa = targa;
+        if (veicolo) dettagliRamo.veicolo = veicolo;
+
         var newPolizza = {
             cliente_id: clienteId,
             compagnia_id: compagniaId,
             ramo_id: ramoId,
             collaboratore_id: collabId ? parseInt(collabId) : null,
             numero_polizza: numPolizza,
-            targa: document.getElementById('pdf_targa').value || null,
-            data_decorrenza: document.getElementById('pdf_decorrenza').value || null,
-            data_scadenza: document.getElementById('pdf_scadenza').value || null,
+            data_emissione: decorrenza || new Date().toISOString().slice(0, 10),
+            data_effetto: decorrenza,
+            data_scadenza: scadenza,
             premio_lordo: parseFloat(document.getElementById('pdf_premioLordo').value) || 0,
-            premio_imponibile: parseFloat(document.getElementById('pdf_imponibile').value) || 0,
+            imponibile: parseFloat(document.getElementById('pdf_imponibile').value) || null,
             imposte: parseFloat(document.getElementById('pdf_tasse').value) || 0,
             ssn: parseFloat(document.getElementById('pdf_ssn').value) || 0,
             frazionamento: document.getElementById('pdf_frazionamento').value || 'Annuale',
             stato: 'attiva',
+            tacito_rinnovo: true,
+            dettagli_ramo: Object.keys(dettagliRamo).length > 0 ? dettagliRamo : {},
             note: 'Importato via Agente AI PDF — ' + (currentPDFData ? currentPDFData.originalName : '') +
-                (document.getElementById('pdf_veicolo').value ? ' — Veicolo: ' + document.getElementById('pdf_veicolo').value : '')
+                (veicolo ? ' — Veicolo: ' + veicolo : '')
         };
 
         var { data: savedPol, error: polErr } = await sbClient.from('polizze').insert(newPolizza).select().single();
