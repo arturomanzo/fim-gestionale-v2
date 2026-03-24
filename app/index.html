@@ -1358,7 +1358,7 @@
 // ============================================================
 
 // === STATO APPLICAZIONE ===
-let supabase = null;
+var sbClient = null;
 let currentUser = null;
 let cache = {
     clienti: [],
@@ -1390,8 +1390,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Controlla sessione attiva
-    if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
+    if (sbClient) {
+        const { data: { session } } = await sbClient.auth.getSession();
         if (session) {
             currentUser = session.user;
             showApp();
@@ -1414,7 +1414,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function initSupabase(url, key) {
-    supabase = window.supabase.createClient(url, key);
+    sbClient = window.supabase.createClient(url, key);
 }
 
 // === AUTH ===
@@ -1440,10 +1440,10 @@ async function handleLogin(e) {
         return;
     }
 
-    if (!supabase) initSupabase(url, key);
+    if (!sbClient) initSupabase(url, key);
 
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+        const { data, error } = await sbClient.auth.signInWithPassword({ email, password: pass });
         if (error) throw error;
         currentUser = data.user;
         showApp();
@@ -1455,7 +1455,7 @@ async function handleLogin(e) {
 
 async function handleLogout() {
     if (confirm('Vuoi uscire?')) {
-        if (supabase) await supabase.auth.signOut();
+        if (sbClient) await sbClient.auth.signOut();
         currentUser = null;
         document.getElementById('loginPage').style.display = 'flex';
         document.getElementById('appLayout').style.display = 'none';
@@ -1491,7 +1491,7 @@ function toggleSidebar() {
 
 // === DATA LOADING ===
 async function refreshAll() {
-    if (!supabase) {
+    if (!sbClient) {
         loadDemoData();
         return;
     }
@@ -1514,7 +1514,7 @@ async function refreshAll() {
 }
 
 async function loadClienti() {
-    const { data, error } = await supabase
+    const { data, error } = await sbClient
         .from('clienti')
         .select('*, collaboratori(cognome, nome)')
         .is('eliminato_il', null)
@@ -1525,7 +1525,7 @@ async function loadClienti() {
 }
 
 async function loadPolizze() {
-    const { data, error } = await supabase
+    const { data, error } = await sbClient
         .from('polizze')
         .select('*, clienti(cognome, nome, ragione_sociale), compagnie(nome), rami_assicurativi(nome, codice), collaboratori(cognome, nome)')
         .is('eliminato_il', null)
@@ -1536,12 +1536,12 @@ async function loadPolizze() {
 }
 
 async function loadCompagnie() {
-    const { data } = await supabase.from('compagnie').select('*').eq('attiva', true).order('nome');
+    const { data } = await sbClient.from('compagnie').select('*').eq('attiva', true).order('nome');
     cache.compagnie = data || [];
 }
 
 async function loadRami() {
-    const { data } = await supabase.from('rami_assicurativi').select('*').eq('attivo', true).order('nome');
+    const { data } = await sbClient.from('rami_assicurativi').select('*').eq('attivo', true).order('nome');
     cache.rami = data || [];
     // Popola filtro rami
     const sel = document.getElementById('filterRamoPolizza');
@@ -1552,7 +1552,7 @@ async function loadRami() {
 }
 
 async function loadCollaboratori() {
-    const { data } = await supabase.from('collaboratori').select('*').order('cognome');
+    const { data } = await sbClient.from('collaboratori').select('*').order('cognome');
     cache.collaboratori = data || [];
     renderCollaboratori();
     // Popola select provvigioni
@@ -1566,7 +1566,7 @@ async function loadCollaboratori() {
 }
 
 async function loadSinistri() {
-    const { data } = await supabase
+    const { data } = await sbClient
         .from('sinistri')
         .select('*, clienti(cognome, nome, ragione_sociale), polizze(numero_polizza)')
         .order('data_evento', { ascending: false });
@@ -1575,7 +1575,7 @@ async function loadSinistri() {
 }
 
 async function loadComunicazioni() {
-    const { data } = await supabase
+    const { data } = await sbClient
         .from('comunicazioni')
         .select('*')
         .order('creato_il', { ascending: false })
@@ -1986,7 +1986,7 @@ async function saveCliente() {
         note: document.getElementById('cliNote').value || null
     };
 
-    if (!supabase) {
+    if (!sbClient) {
         data.id = cache.clienti.length + 1;
         data.n_polizze_attive = 0;
         cache.clienti.push(data);
@@ -1997,7 +1997,7 @@ async function saveCliente() {
     }
 
     try {
-        const { error } = await supabase.from('clienti').insert(data);
+        const { error } = await sbClient.from('clienti').insert(data);
         if (error) throw error;
         await loadClienti();
         closeModal('modalCliente');
@@ -2027,9 +2027,9 @@ function saveBrokerSettings() {
 }
 
 async function testConnection() {
-    if (!supabase) { toast('Configura prima Supabase', 'error'); return; }
+    if (!sbClient) { toast('Configura prima Supabase', 'error'); return; }
     try {
-        const { count, error } = await supabase.from('clienti').select('*', { count: 'exact', head: true });
+        const { count, error } = await sbClient.from('clienti').select('*', { count: 'exact', head: true });
         if (error) throw error;
         toast(`Connessione OK! ${count} clienti nel database`, 'success');
     } catch (err) {
@@ -2090,9 +2090,9 @@ function generateReport(type) {
 async function loadProvvigioni() {
     const periodo = document.getElementById('provvPeriodo')?.value;
     const collabId = document.getElementById('provvCollab')?.value;
-    if (!supabase || !periodo) return;
+    if (!sbClient || !periodo) return;
 
-    let query = supabase.from('provvigioni_log')
+    let query = sbClient.from('provvigioni_log')
         .select('*, collaboratori(cognome, nome), polizze(numero_polizza)')
         .eq('periodo', periodo);
     if (collabId) query = query.eq('collaboratore_id', parseInt(collabId));
