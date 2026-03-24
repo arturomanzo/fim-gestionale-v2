@@ -2254,7 +2254,7 @@ function buildFimaContext(question) {
 
 async function callFimaAI(question, context) {
     // Prova prima il proxy Vercel
-    const apiUrl = localStorage.getItem('fim_ai_proxy') || '/api/claude';
+    const apiUrl = localStorage.getItem('fim_ai_proxy') || 'https://fim-gestionale-v2.vercel.app/api/claude';
 
     const systemPrompt = `Sei FIMA, l'assistente AI di FIM Insurance Broker S.A.S. (RUI Sez. B N. B000405449).
 Il titolare e' Arturo Manzo. Rispondi sempre in italiano, in modo conciso e professionale.

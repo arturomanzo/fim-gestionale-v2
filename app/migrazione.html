@@ -60,8 +60,9 @@
         <p>Inserisci le credenziali del tuo progetto Supabase (le trovi in Project Settings > API)</p>
         <div class="form-row">
             <div><label>Project URL</label><input type="text" id="sbUrl" placeholder="https://xxxxx.supabase.co"></div>
-            <div><label>Service Role Key (secret)</label><input type="password" id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIs..."></div>
+            <div><label>Service Role Key (secret) ⚠️</label><input type="password" id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIs..."></div>
         </div>
+        <div style="font-size:12px;color:var(--warning);margin-bottom:12px;margin-top:-4px">⚠️ Usa la <strong>Service Role Key</strong> (NON la anon key). La trovi in Supabase → Settings → API → service_role (secret).</div>
         <button class="btn btn-primary" onclick="testSupabase()">Testa Connessione</button>
         <span id="connStatus" style="margin-left:12px;font-size:13px"></span>
     </div>
@@ -133,7 +134,7 @@ drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('
 // Carica settings salvati o defaults
 (() => {
     const defaultUrl = 'https://cdhhfyhzwhdjoafitiwf.supabase.co';
-    const defaultKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkaGhmeWh6d2hkam9hZml0aXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjc4NjYsImV4cCI6MjA4OTk0Mzg2Nn0.tikfiRE0dJ7RfOlvUsyo9Ei89Z28g6NBoM-LUtqakK8';
+    const defaultKey = ''; // Inserisci la Service Role Key (NON la anon key) dal pannello Supabase > Settings > API
     const u = localStorage.getItem('fim_supabase_url') || defaultUrl;
     const k = localStorage.getItem('fim_supabase_key') || defaultKey;
     document.getElementById('sbUrl').value = u;

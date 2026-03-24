@@ -1,0 +1,15 @@
+{
+  "brokerEmail": "arturomanzo@outlook.com",
+  "brokerName": "FIM Insurance Broker",
+  "brokerPhone": "",
+  "days7": "7",
+  "days15": "15",
+  "days30": "30",
+  "remind7": true,
+  "remind15": true,
+  "remind30": true,
+  "remindBroker": true,
+  "firebaseApiKey": "AIzaSyAdrtV-54W2Ajhfz_4lLH65fd9Oz3K33gM",
+  "firebaseDatabaseUrl": "https://fim-insurance-broker-default-rtdb.europe-west1.firebasedatabase.app",
+  "firebaseProjectId": "fim-insurance-broker"
+}

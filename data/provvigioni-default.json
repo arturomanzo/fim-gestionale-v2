@@ -1,0 +1,18 @@
+{
+  "Altro": {"Agente": 12, "Collaboratore": 7, "Responsabile Area": 2, "Segnalatore": 3, "Subagente": 10},
+  "Assistenza": {"Agente": 18, "Collaboratore": 10, "Responsabile Area": 3, "Segnalatore": 5, "Subagente": 15},
+  "Fattura": {"Agente": 0, "Collaboratore": 0, "Responsabile Area": 0, "Segnalatore": 0, "Subagente": 0},
+  "Furto_Incendio": {"Agente": 12, "Collaboratore": 7, "Responsabile Area": 2.5, "Segnalatore": 3, "Subagente": 10},
+  "Infortuni": {"Agente": 18, "Collaboratore": 10, "Responsabile Area": 3, "Segnalatore": 5, "Subagente": 15},
+  "Kasko": {"Agente": 14, "Collaboratore": 8, "Responsabile Area": 3, "Segnalatore": 4, "Subagente": 12},
+  "Multirischio": {"Agente": 18, "Collaboratore": 10, "Responsabile Area": 3, "Segnalatore": 5, "Subagente": 15},
+  "Multirischio Casa": {"Agente": 16, "Collaboratore": 9, "Responsabile Area": 3, "Segnalatore": 5, "Subagente": 14},
+  "Proforma": {"Agente": 0, "Collaboratore": 0, "Responsabile Area": 0, "Segnalatore": 0, "Subagente": 0},
+  "RC Generale": {"Agente": 14, "Collaboratore": 8, "Responsabile Area": 2.5, "Segnalatore": 4, "Subagente": 12},
+  "RC Professionale": {"Agente": 16, "Collaboratore": 9, "Responsabile Area": 3, "Segnalatore": 5, "Subagente": 14},
+  "RCA": {"Agente": 7, "Collaboratore": 4, "Responsabile Area": 1.5, "Segnalatore": 2, "Subagente": 6},
+  "RCA + Furto_Incendio": {"Agente": 10, "Collaboratore": 6, "Responsabile Area": 2, "Segnalatore": 3, "Subagente": 8},
+  "Trasporti": {"Agente": 16, "Collaboratore": 9, "Responsabile Area": 3, "Segnalatore": 5, "Subagente": 14},
+  "Tutela Legale": {"Agente": 20, "Collaboratore": 12, "Responsabile Area": 4, "Segnalatore": 5, "Subagente": 17},
+  "Vita": {"Agente": 12, "Collaboratore": 7, "Responsabile Area": 2, "Segnalatore": 3, "Subagente": 10}
+}
