@@ -1,0 +1,2392 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1A3A5C">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FIM Broker">
+    <meta name="description" content="FIM Insurance Broker - Gestionale Assicurativo">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231A3A5C'/><text x='50' y='68' font-size='48' font-weight='bold' text-anchor='middle' fill='white'>FIM</text></svg>">
+    <title>FIM Gestionale v2</title>
+
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <!-- jsPDF per export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        /* ============================================================
+           FIM GESTIONALE v2 - CSS DESIGN SYSTEM
+           ============================================================ */
+        :root {
+            --fim-navy: #1A3A5C;
+            --fim-navy-light: #2A5A8C;
+            --fim-teal: #00C4B4;
+            --fim-teal-dark: #00A89A;
+            --fim-white: #FFFFFF;
+            --fim-bg: #F0F4F8;
+            --fim-card: #FFFFFF;
+            --fim-text: #1E293B;
+            --fim-text-light: #64748B;
+            --fim-border: #E2E8F0;
+            --fim-success: #10B981;
+            --fim-warning: #F59E0B;
+            --fim-danger: #EF4444;
+            --fim-info: #3B82F6;
+            --sidebar-w: 260px;
+            --header-h: 64px;
+            --radius: 12px;
+            --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,.1), 0 4px 6px rgba(0,0,0,.05);
+            --transition: all .2s ease;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--fim-bg);
+            color: var(--fim-text);
+            line-height: 1.5;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* === LAYOUT === */
+        .app-layout {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* === SIDEBAR === */
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--fim-navy);
+            color: var(--fim-white);
+            display: flex;
+            flex-direction: column;
+            transition: var(--transition);
+            z-index: 100;
+            position: fixed;
+            height: 100vh;
+        }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sidebar-logo {
+            width: 40px; height: 40px;
+            background: var(--fim-teal);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 14px; color: var(--fim-navy);
+        }
+        .sidebar-brand h2 { font-size: 16px; font-weight: 700; }
+        .sidebar-brand small { font-size: 11px; opacity: .6; }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+        }
+        .sidebar-nav a {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 14px;
+            color: rgba(255,255,255,.7);
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: var(--transition);
+            cursor: pointer;
+            margin-bottom: 2px;
+        }
+        .sidebar-nav a:hover { background: rgba(255,255,255,.1); color: #fff; }
+        .sidebar-nav a.active { background: var(--fim-teal); color: var(--fim-navy); font-weight: 600; }
+        .sidebar-nav a .nav-icon { width: 20px; text-align: center; font-size: 16px; }
+        .sidebar-nav a .badge {
+            margin-left: auto;
+            background: var(--fim-danger);
+            color: #fff;
+            font-size: 11px;
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .nav-section { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: .4; padding: 16px 14px 6px; }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid rgba(255,255,255,.1);
+            font-size: 12px;
+            opacity: .5;
+            text-align: center;
+        }
+
+        /* === MAIN CONTENT === */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-w);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* === HEADER === */
+        .header {
+            height: var(--header-h);
+            background: var(--fim-card);
+            border-bottom: 1px solid var(--fim-border);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            gap: 16px;
+            box-shadow: var(--shadow);
+            z-index: 50;
+        }
+        .header-search {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+        }
+        .header-search input {
+            width: 100%;
+            padding: 8px 12px 8px 36px;
+            border: 1px solid var(--fim-border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--fim-bg);
+            transition: var(--transition);
+        }
+        .header-search input:focus {
+            outline: none;
+            border-color: var(--fim-teal);
+            box-shadow: 0 0 0 3px rgba(0,196,180,.15);
+        }
+        .header-search .search-icon {
+            position: absolute; left: 10px; top: 50%;
+            transform: translateY(-50%);
+            color: var(--fim-text-light);
+        }
+        .header-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        .header-btn {
+            width: 38px; height: 38px;
+            border-radius: 8px;
+            border: 1px solid var(--fim-border);
+            background: var(--fim-card);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+            transition: var(--transition);
+            position: relative;
+        }
+        .header-btn:hover { background: var(--fim-bg); }
+        .header-btn .notif-dot {
+            position: absolute; top: 6px; right: 6px;
+            width: 8px; height: 8px;
+            background: var(--fim-danger);
+            border-radius: 50%;
+            border: 2px solid var(--fim-card);
+        }
+        .user-avatar {
+            width: 36px; height: 36px;
+            background: var(--fim-teal);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 14px; color: var(--fim-navy);
+            cursor: pointer;
+        }
+        .mobile-menu-btn {
+            display: none;
+            background: none; border: none;
+            font-size: 22px; cursor: pointer;
+            color: var(--fim-text);
+        }
+
+        /* === PAGE CONTENT === */
+        .page-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        .page-title {
+            font-size: 24px; font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .page-subtitle {
+            font-size: 14px;
+            color: var(--fim-text-light);
+            margin-bottom: 20px;
+        }
+
+        /* === CARDS === */
+        .card {
+            background: var(--fim-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--fim-border);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        /* === KPI GRID === */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .kpi-card {
+            background: var(--fim-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--fim-border);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+        .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+        .kpi-icon {
+            width: 44px; height: 44px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            margin-bottom: 12px;
+        }
+        .kpi-icon.blue { background: #DBEAFE; color: #2563EB; }
+        .kpi-icon.green { background: #D1FAE5; color: #059669; }
+        .kpi-icon.amber { background: #FEF3C7; color: #D97706; }
+        .kpi-icon.red { background: #FEE2E2; color: #DC2626; }
+        .kpi-icon.teal { background: #CCFBF1; color: #0D9488; }
+        .kpi-value { font-size: 28px; font-weight: 800; line-height: 1.1; }
+        .kpi-label { font-size: 13px; color: var(--fim-text-light); margin-top: 4px; }
+        .kpi-change {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 12px; font-weight: 600;
+            margin-top: 8px; padding: 2px 8px;
+            border-radius: 6px;
+        }
+        .kpi-change.up { background: #D1FAE5; color: #059669; }
+        .kpi-change.down { background: #FEE2E2; color: #DC2626; }
+
+        /* === TABLES === */
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 13px;
+        }
+        .data-table thead th {
+            background: var(--fim-bg);
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--fim-text-light);
+            border-bottom: 1px solid var(--fim-border);
+            position: sticky;
+            top: 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+        .data-table tbody tr {
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        .data-table tbody tr:hover { background: #F8FAFC; }
+        .data-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--fim-border);
+            vertical-align: middle;
+        }
+
+        /* === BADGES / STATUS === */
+        .badge {
+            display: inline-flex; align-items: center;
+            padding: 3px 10px; border-radius: 6px;
+            font-size: 12px; font-weight: 600;
+        }
+        .badge-success { background: #D1FAE5; color: #059669; }
+        .badge-warning { background: #FEF3C7; color: #D97706; }
+        .badge-danger { background: #FEE2E2; color: #DC2626; }
+        .badge-info { background: #DBEAFE; color: #2563EB; }
+        .badge-default { background: #F1F5F9; color: #475569; }
+
+        .semaforo {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .semaforo.verde { background: var(--fim-success); }
+        .semaforo.giallo { background: var(--fim-warning); }
+        .semaforo.arancio { background: #F97316; }
+        .semaforo.rosso { background: var(--fim-danger); }
+
+        /* === BUTTONS === */
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+        }
+        .btn-primary { background: var(--fim-teal); color: var(--fim-navy); }
+        .btn-primary:hover { background: var(--fim-teal-dark); }
+        .btn-secondary { background: var(--fim-bg); color: var(--fim-text); border: 1px solid var(--fim-border); }
+        .btn-secondary:hover { background: var(--fim-border); }
+        .btn-danger { background: var(--fim-danger); color: #fff; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        .btn-lg { padding: 12px 24px; font-size: 15px; }
+
+        /* === FORMS === */
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--fim-text-light);
+        }
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--fim-border);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: var(--transition);
+            background: var(--fim-card);
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--fim-teal);
+            box-shadow: 0 0 0 3px rgba(0,196,180,.15);
+        }
+        select.form-control { appearance: auto; }
+
+        /* === MODAL === */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,.5);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--fim-card);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 640px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+        }
+        .modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--fim-border);
+        }
+        .modal-header h3 { font-size: 18px; }
+        .modal-close {
+            width: 32px; height: 32px;
+            border-radius: 8px; border: none;
+            background: var(--fim-bg);
+            cursor: pointer; font-size: 18px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .modal-body { padding: 24px; }
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--fim-border);
+            display: flex; justify-content: flex-end; gap: 8px;
+        }
+
+        /* === TABS === */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--fim-border);
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        .tab {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--fim-text-light);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            white-space: nowrap;
+            transition: var(--transition);
+        }
+        .tab:hover { color: var(--fim-text); }
+        .tab.active {
+            color: var(--fim-teal-dark);
+            border-bottom-color: var(--fim-teal);
+            font-weight: 600;
+        }
+
+        /* === CHART CONTAINERS === */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .chart-container { position: relative; height: 280px; }
+
+        /* === LOADING === */
+        .loading-spinner {
+            display: flex; align-items: center; justify-content: center;
+            padding: 40px;
+        }
+        .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid var(--fim-border);
+            border-top-color: var(--fim-teal);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* === LOGIN PAGE === */
+        .login-page {
+            height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, var(--fim-navy) 0%, #0F2A44 100%);
+        }
+        .login-card {
+            background: var(--fim-card);
+            border-radius: 20px;
+            padding: 40px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+        }
+        .login-card .logo {
+            width: 64px; height: 64px;
+            background: var(--fim-teal);
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 22px; color: var(--fim-navy);
+            margin: 0 auto 20px;
+        }
+        .login-card h1 { font-size: 22px; margin-bottom: 4px; }
+        .login-card p { font-size: 14px; color: var(--fim-text-light); margin-bottom: 24px; }
+        .login-error {
+            background: #FEE2E2; color: #DC2626;
+            padding: 8px 14px; border-radius: 8px;
+            font-size: 13px; margin-bottom: 14px;
+            display: none;
+        }
+
+        /* === EMPTY STATE === */
+        .empty-state {
+            text-align: center; padding: 60px 20px;
+            color: var(--fim-text-light);
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: .5; }
+        .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--fim-text); }
+
+        /* === TOAST === */
+        .toast-container {
+            position: fixed; bottom: 24px; right: 24px;
+            z-index: 2000;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .toast {
+            padding: 12px 20px;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            box-shadow: var(--shadow-lg);
+            animation: slideIn .3s ease;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .toast-success { background: #059669; }
+        .toast-error { background: #DC2626; }
+        .toast-info { background: #2563EB; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+            }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+            .mobile-menu-btn { display: block; }
+            .page-content { padding: 16px; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: 1fr; }
+            .header-search { max-width: 200px; }
+            :root { --sidebar-w: 280px; }
+        }
+        @media (max-width: 480px) {
+            .kpi-grid { grid-template-columns: 1fr; }
+            .kpi-value { font-size: 22px; }
+        }
+
+        /* === SCROLLBAR === */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+        /* Hide pages */
+        .page { display: none; }
+        .page.active { display: block; }
+
+        /* Scadenzario colors */
+        .scad-row-critica { background: #FEF2F2 !important; }
+        .scad-row-urgente { background: #FFFBEB !important; }
+        .scad-row-attenzione { background: #FFF7ED !important; }
+
+        /* Quick actions floating */
+        .fab {
+            position: fixed; bottom: 24px; right: 24px;
+            width: 56px; height: 56px;
+            background: var(--fim-teal);
+            border-radius: 16px;
+            border: none;
+            box-shadow: var(--shadow-lg);
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--fim-navy);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 90;
+            transition: var(--transition);
+        }
+        .fab:hover { transform: scale(1.1); }
+
+        /* Offline indicator */
+        .offline-bar {
+            background: var(--fim-warning);
+            color: #000;
+            text-align: center;
+            padding: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            display: none;
+        }
+        .offline-bar.show { display: block; }
+
+        /* === FIMA AI PANEL === */
+        .fima-panel {
+            position: fixed;
+            bottom: 90px; right: 24px;
+            width: 380px;
+            max-height: 520px;
+            background: var(--fim-card);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.2);
+            display: none;
+            flex-direction: column;
+            z-index: 200;
+            overflow: hidden;
+            border: 1px solid var(--fim-border);
+        }
+        .fima-panel.open { display: flex; }
+        .fima-header {
+            background: linear-gradient(135deg, var(--fim-navy), #0F2A44);
+            color: #fff;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .fima-avatar {
+            width: 32px; height: 32px;
+            background: var(--fim-teal);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 12px; color: var(--fim-navy);
+        }
+        .fima-close {
+            background: rgba(255,255,255,.15);
+            border: none; color: #fff;
+            width: 28px; height: 28px;
+            border-radius: 6px;
+            cursor: pointer; font-size: 16px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .fima-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            max-height: 320px;
+        }
+        .fima-msg {
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+            max-width: 90%;
+        }
+        .fima-ai {
+            background: var(--fim-bg);
+            border-bottom-left-radius: 4px;
+        }
+        .fima-user {
+            background: var(--fim-navy);
+            color: #fff;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        .fima-typing {
+            display: flex; gap: 4px; padding: 10px 14px;
+        }
+        .fima-typing span {
+            width: 6px; height: 6px;
+            background: var(--fim-text-light);
+            border-radius: 50%;
+            animation: typingDot 1.4s infinite;
+        }
+        .fima-typing span:nth-child(2) { animation-delay: .2s; }
+        .fima-typing span:nth-child(3) { animation-delay: .4s; }
+        @keyframes typingDot { 0%,60%,100% { opacity: .3; } 30% { opacity: 1; } }
+        .fima-quick {
+            padding: 8px 12px;
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            border-top: 1px solid var(--fim-border);
+        }
+        .fima-quick button {
+            white-space: nowrap;
+            padding: 5px 12px;
+            border-radius: 16px;
+            border: 1px solid var(--fim-border);
+            background: var(--fim-card);
+            font-size: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .fima-quick button:hover { background: var(--fim-teal); color: var(--fim-navy); border-color: var(--fim-teal); }
+        .fima-input {
+            display: flex;
+            padding: 12px;
+            border-top: 1px solid var(--fim-border);
+            gap: 8px;
+        }
+        .fima-input input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--fim-border);
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .fima-input input:focus { outline: none; border-color: var(--fim-teal); }
+        .fima-send {
+            width: 36px; height: 36px;
+            background: var(--fim-teal);
+            border: none; border-radius: 8px;
+            color: var(--fim-navy);
+            font-size: 16px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        @media (max-width: 480px) {
+            .fima-panel { width: calc(100% - 32px); right: 16px; bottom: 80px; }
+        }
+
+        /* Print */
+        @media print {
+            .sidebar, .header, .fab { display: none !important; }
+            .main-content { margin-left: 0 !important; }
+            .page-content { padding: 0 !important; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ============================================================
+     LOGIN PAGE
+     ============================================================ -->
+<div id="loginPage" class="login-page">
+    <div class="login-card">
+        <div class="logo">FIM</div>
+        <h1>FIM Gestionale</h1>
+        <p>Accedi con le tue credenziali</p>
+        <div id="loginError" class="login-error"></div>
+        <form onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <input type="email" id="loginEmail" class="form-control" placeholder="Email" required autocomplete="email">
+            </div>
+            <div class="form-group">
+                <input type="password" id="loginPassword" class="form-control" placeholder="Password" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:8px">
+                Accedi
+            </button>
+        </form>
+        <p style="margin-top:20px;font-size:12px;opacity:.5">FIM Insurance Broker S.A.S. - RUI B000405449</p>
+    </div>
+</div>
+
+<!-- ============================================================
+     APP LAYOUT
+     ============================================================ -->
+<div id="appLayout" class="app-layout" style="display:none">
+
+    <!-- Offline bar -->
+    <div id="offlineBar" class="offline-bar">Connessione assente - modalita' offline</div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">FIM</div>
+            <div class="sidebar-brand">
+                <h2>FIM Gestionale</h2>
+                <small>Insurance Broker</small>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">Principale</div>
+            <a onclick="navigateTo('dashboard')" data-page="dashboard" class="active">
+                <span class="nav-icon">&#x1F4CA;</span> Dashboard
+            </a>
+            <a onclick="navigateTo('clienti')" data-page="clienti">
+                <span class="nav-icon">&#x1F465;</span> Clienti
+            </a>
+            <a onclick="navigateTo('polizze')" data-page="polizze">
+                <span class="nav-icon">&#x1F4C4;</span> Polizze
+            </a>
+
+            <div class="nav-section">Operativo</div>
+            <a onclick="navigateTo('scadenzario')" data-page="scadenzario">
+                <span class="nav-icon">&#x23F0;</span> Scadenzario
+                <span class="badge" id="badgeScadenze">0</span>
+            </a>
+            <a onclick="navigateTo('sinistri')" data-page="sinistri">
+                <span class="nav-icon">&#x26A0;</span> Sinistri
+            </a>
+            <a onclick="navigateTo('comunicazioni')" data-page="comunicazioni">
+                <span class="nav-icon">&#x2709;</span> Comunicazioni
+            </a>
+
+            <div class="nav-section">Amministrazione</div>
+            <a onclick="navigateTo('provvigioni')" data-page="provvigioni">
+                <span class="nav-icon">&#x1F4B0;</span> Provvigioni
+            </a>
+            <a onclick="navigateTo('collaboratori')" data-page="collaboratori">
+                <span class="nav-icon">&#x1F464;</span> Collaboratori
+            </a>
+            <a onclick="navigateTo('compliance')" data-page="compliance">
+                <span class="nav-icon">&#x2705;</span> Compliance IDD
+            </a>
+
+            <div class="nav-section">Strumenti</div>
+            <a onclick="navigateTo('report')" data-page="report">
+                <span class="nav-icon">&#x1F4C8;</span> Report
+            </a>
+            <a onclick="navigateTo('impostazioni')" data-page="impostazioni">
+                <span class="nav-icon">&#x2699;</span> Impostazioni
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            v2.0 &middot; Supabase Cloud<br>
+            &copy; 2026 FIM Insurance Broker
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="main-content">
+        <!-- HEADER -->
+        <header class="header">
+            <button class="mobile-menu-btn" onclick="toggleSidebar()">&#9776;</button>
+            <div class="header-search">
+                <span class="search-icon">&#128269;</span>
+                <input type="text" id="globalSearch" placeholder="Cerca clienti, polizze, sinistri..." oninput="handleGlobalSearch(this.value)">
+            </div>
+            <div class="header-right">
+                <button class="header-btn" onclick="navigateTo('comunicazioni')" title="Notifiche">
+                    &#128276;
+                    <span class="notif-dot" id="notifDot" style="display:none"></span>
+                </button>
+                <button class="header-btn" onclick="refreshAll()" title="Aggiorna dati">&#x21BB;</button>
+                <div class="user-avatar" id="userAvatar" onclick="handleLogout()" title="Esci">AM</div>
+            </div>
+        </header>
+
+        <!-- PAGES -->
+        <div class="page-content">
+
+            <!-- ======== DASHBOARD ======== -->
+            <div id="page-dashboard" class="page active">
+                <h1 class="page-title">Dashboard</h1>
+                <p class="page-subtitle" id="dashSubtitle">Panoramica portafoglio FIM Insurance Broker</p>
+
+                <div class="kpi-grid" id="kpiGrid">
+                    <div class="kpi-card">
+                        <div class="kpi-icon blue">&#x1F4C4;</div>
+                        <div class="kpi-value" id="kpiPolizzeAttive">-</div>
+                        <div class="kpi-label">Polizze Attive</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon green">&#x1F4B6;</div>
+                        <div class="kpi-value" id="kpiPremiTotali">-</div>
+                        <div class="kpi-label">Premi Lordi Totali</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon teal">&#x1F465;</div>
+                        <div class="kpi-value" id="kpiClienti">-</div>
+                        <div class="kpi-label">Clienti Attivi</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon amber">&#x23F0;</div>
+                        <div class="kpi-value" id="kpiScadenze30">-</div>
+                        <div class="kpi-label">Scadenze 30gg</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon red">&#x26A0;</div>
+                        <div class="kpi-value" id="kpiSinistriAperti">-</div>
+                        <div class="kpi-label">Sinistri Aperti</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon blue">&#x1F4B0;</div>
+                        <div class="kpi-value" id="kpiProvvMese">-</div>
+                        <div class="kpi-label">Provvigioni Mese</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Polizze per Ramo</span>
+                        </div>
+                        <div class="chart-container"><canvas id="chartRami"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Premi per Compagnia</span>
+                        </div>
+                        <div class="chart-container"><canvas id="chartCompagnie"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Scadenze Imminenti</span>
+                        <button class="btn btn-sm btn-secondary" onclick="navigateTo('scadenzario')">Vedi tutte</button>
+                    </div>
+                    <div style="overflow-x:auto">
+                        <table class="data-table" id="dashScadenzeTable">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Cliente</th>
+                                    <th>Polizza</th>
+                                    <th>Compagnia</th>
+                                    <th>Ramo</th>
+                                    <th>Scadenza</th>
+                                    <th>Premio</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashScadenzeBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======== CLIENTI ======== -->
+            <div id="page-clienti" class="page">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h1 class="page-title">Clienti</h1>
+                        <p class="page-subtitle">Anagrafica clienti FIM</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openModal('modalCliente')">+ Nuovo Cliente</button>
+                </div>
+                <div class="card" style="padding:12px">
+                    <input type="text" class="form-control" id="searchClienti" placeholder="Cerca per nome, CF, P.IVA..." oninput="filterClienti()">
+                </div>
+                <div class="card" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nome / Ragione Sociale</th>
+                                <th>CF / P.IVA</th>
+                                <th>Email</th>
+                                <th>Cellulare</th>
+                                <th>Polizze</th>
+                                <th>Collaboratore</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clientiBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ======== POLIZZE ======== -->
+            <div id="page-polizze" class="page">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h1 class="page-title">Polizze</h1>
+                        <p class="page-subtitle">Portafoglio assicurativo</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openModal('modalPolizza')">+ Nuova Polizza</button>
+                </div>
+                <div class="card" style="padding:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                    <input type="text" class="form-control" id="searchPolizze" placeholder="Cerca polizze..." style="flex:1;min-width:200px" oninput="filterPolizze()">
+                    <select class="form-control" id="filterStatoPolizza" style="width:auto" onchange="filterPolizze()">
+                        <option value="">Tutti gli stati</option>
+                        <option value="attiva">Attive</option>
+                        <option value="scaduta">Scadute</option>
+                        <option value="in_rinnovo">In Rinnovo</option>
+                        <option value="annullata">Annullate</option>
+                    </select>
+                    <select class="form-control" id="filterRamoPolizza" style="width:auto" onchange="filterPolizze()">
+                        <option value="">Tutti i rami</option>
+                    </select>
+                </div>
+                <div class="card" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>N. Polizza</th>
+                                <th>Cliente</th>
+                                <th>Compagnia</th>
+                                <th>Ramo</th>
+                                <th>Effetto</th>
+                                <th>Scadenza</th>
+                                <th>Premio</th>
+                                <th>Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody id="polizzeBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ======== SCADENZARIO ======== -->
+            <div id="page-scadenzario" class="page">
+                <h1 class="page-title">Scadenzario</h1>
+                <p class="page-subtitle">Polizze in scadenza</p>
+                <div class="tabs">
+                    <div class="tab active" onclick="setScadTab(this,'critica')">Critiche (7gg)</div>
+                    <div class="tab" onclick="setScadTab(this,'urgente')">Urgenti (30gg)</div>
+                    <div class="tab" onclick="setScadTab(this,'attenzione')">Attenzione (60gg)</div>
+                    <div class="tab" onclick="setScadTab(this,'tutte')">Tutte</div>
+                </div>
+                <div class="card" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>GG</th>
+                                <th>Cliente</th>
+                                <th>Polizza</th>
+                                <th>Compagnia</th>
+                                <th>Ramo</th>
+                                <th>Scadenza</th>
+                                <th>Premio</th>
+                                <th>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scadenzarioBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ======== SINISTRI ======== -->
+            <div id="page-sinistri" class="page">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h1 class="page-title">Sinistri</h1>
+                        <p class="page-subtitle">Gestione sinistri</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openModal('modalSinistro')">+ Nuovo Sinistro</button>
+                </div>
+                <div class="card" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>N. Sinistro</th>
+                                <th>Cliente</th>
+                                <th>Polizza</th>
+                                <th>Data Evento</th>
+                                <th>Tipo</th>
+                                <th>Riserva</th>
+                                <th>Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sinistriBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ======== COMUNICAZIONI ======== -->
+            <div id="page-comunicazioni" class="page">
+                <h1 class="page-title">Comunicazioni</h1>
+                <p class="page-subtitle">Email, SMS e notifiche automatiche</p>
+                <div class="tabs">
+                    <div class="tab active" onclick="setComTab(this,'tutte')">Tutte</div>
+                    <div class="tab" onclick="setComTab(this,'programmato')">Programmate</div>
+                    <div class="tab" onclick="setComTab(this,'inviato')">Inviate</div>
+                    <div class="tab" onclick="setComTab(this,'errore')">Errori</div>
+                </div>
+                <div class="card" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Canale</th>
+                                <th>Tipo</th>
+                                <th>Destinatario</th>
+                                <th>Oggetto</th>
+                                <th>Data</th>
+                                <th>Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comunicazioniBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ======== PROVVIGIONI ======== -->
+            <div id="page-provvigioni" class="page">
+                <h1 class="page-title">Provvigioni</h1>
+                <p class="page-subtitle">Riepilogo provvigioni collaboratori</p>
+                <div class="card" style="padding:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                    <select class="form-control" id="provvPeriodo" style="width:auto" onchange="loadProvvigioni()">
+                    </select>
+                    <select class="form-control" id="provvCollab" style="width:auto" onchange="loadProvvigioni()">
+                        <option value="">Tutti i collaboratori</option>
+                    </select>
+                    <button class="btn btn-secondary btn-sm" onclick="exportProvvigioni()">Esporta CSV</button>
+                </div>
+                <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+                    <div class="kpi-card"><div class="kpi-value" id="provvTotale">-</div><div class="kpi-label">Totale Maturato</div></div>
+                    <div class="kpi-card"><div class="kpi-value" id="provvPolizze">-</div><div class="kpi-label">Polizze</div></div>
+                    <div class="kpi-card"><div class="kpi-value" id="provvMedia">-</div><div class="kpi-label">Media per Polizza</div></div>
+                </div>
+                <div class="card" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Collaboratore</th>
+                                <th>Polizza</th>
+                                <th>Imponibile</th>
+                                <th>%</th>
+                                <th>Provvigione</th>
+                                <th>Periodo</th>
+                                <th>Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="provvigioniBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ======== COLLABORATORI ======== -->
+            <div id="page-collaboratori" class="page">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h1 class="page-title">Collaboratori</h1>
+                        <p class="page-subtitle">Rete commerciale FIM</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openModal('modalCollab')">+ Nuovo Collaboratore</button>
+                </div>
+                <div class="card" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Codice</th>
+                                <th>Nome</th>
+                                <th>RUI</th>
+                                <th>Ruolo</th>
+                                <th>Email</th>
+                                <th>Provv. Base</th>
+                                <th>Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody id="collaboratoriBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ======== COMPLIANCE IDD ======== -->
+            <div id="page-compliance" class="page">
+                <h1 class="page-title">Compliance IDD</h1>
+                <p class="page-subtitle">Verifica adeguatezza - Reg. IVASS 40/2018</p>
+                <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+                    <div class="kpi-card">
+                        <div class="kpi-icon green">&#x2705;</div>
+                        <div class="kpi-value" id="iddConformi">-</div>
+                        <div class="kpi-label">Polizze Conformi</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon red">&#x274C;</div>
+                        <div class="kpi-value" id="iddMancanti">-</div>
+                        <div class="kpi-label">IDD Mancante</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon amber">&#x270D;</div>
+                        <div class="kpi-value" id="iddNonFirmati">-</div>
+                        <div class="kpi-label">Non Firmati</div>
+                    </div>
+                </div>
+                <div class="card" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Polizza</th>
+                                <th>Cliente</th>
+                                <th>Ramo</th>
+                                <th>Data Emissione</th>
+                                <th>IDD</th>
+                                <th>Firmata</th>
+                                <th>DIP</th>
+                                <th>GG senza IDD</th>
+                            </tr>
+                        </thead>
+                        <tbody id="complianceBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ======== REPORT ======== -->
+            <div id="page-report" class="page">
+                <h1 class="page-title">Report</h1>
+                <p class="page-subtitle">Genera report e analisi</p>
+                <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+                    <div class="card" style="cursor:pointer" onclick="generateReport('portafoglio')">
+                        <h3 style="font-size:16px;margin-bottom:8px">&#x1F4CA; Report Portafoglio</h3>
+                        <p style="font-size:13px;color:var(--fim-text-light)">Riepilogo completo polizze attive per ramo e compagnia</p>
+                    </div>
+                    <div class="card" style="cursor:pointer" onclick="generateReport('provvigioni')">
+                        <h3 style="font-size:16px;margin-bottom:8px">&#x1F4B0; Estratto Conto Provvigionale</h3>
+                        <p style="font-size:13px;color:var(--fim-text-light)">Dettaglio provvigioni per collaboratore e periodo</p>
+                    </div>
+                    <div class="card" style="cursor:pointer" onclick="generateReport('scadenze')">
+                        <h3 style="font-size:16px;margin-bottom:8px">&#x23F0; Report Scadenze</h3>
+                        <p style="font-size:13px;color:var(--fim-text-light)">Elenco polizze in scadenza con semaforo</p>
+                    </div>
+                    <div class="card" style="cursor:pointer" onclick="generateReport('compliance')">
+                        <h3 style="font-size:16px;margin-bottom:8px">&#x2705; Audit Compliance IDD</h3>
+                        <p style="font-size:13px;color:var(--fim-text-light)">Verifica stato adeguatezza e DIP</p>
+                    </div>
+                    <div class="card" style="cursor:pointer" onclick="generateReport('ec_cliente')">
+                        <h3 style="font-size:16px;margin-bottom:8px">&#x1F4C4; Estratto Conto Cliente</h3>
+                        <p style="font-size:13px;color:var(--fim-text-light)">Riepilogo polizze per singolo assicurato</p>
+                    </div>
+                    <div class="card" style="cursor:pointer" onclick="generateReport('sinistri')">
+                        <h3 style="font-size:16px;margin-bottom:8px">&#x26A0; Report Sinistri</h3>
+                        <p style="font-size:13px;color:var(--fim-text-light)">Sinistri aperti e loss ratio per ramo</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======== IMPOSTAZIONI ======== -->
+            <div id="page-impostazioni" class="page">
+                <h1 class="page-title">Impostazioni</h1>
+                <p class="page-subtitle">Configurazione sistema</p>
+                <div class="card">
+                    <h3 style="font-size:16px;margin-bottom:16px">Connessione Supabase</h3>
+                    <div class="form-group">
+                        <label>Supabase URL</label>
+                        <input type="text" class="form-control" id="settSupabaseUrl" placeholder="https://xxxxx.supabase.co">
+                    </div>
+                    <div class="form-group">
+                        <label>Anon Key</label>
+                        <input type="text" class="form-control" id="settSupabaseKey" placeholder="eyJhbGciOiJIUzI1NiIs...">
+                    </div>
+                    <button class="btn btn-primary" onclick="saveSettings()">Salva Configurazione</button>
+                    <button class="btn btn-secondary" onclick="testConnection()" style="margin-left:8px">Test Connessione</button>
+                </div>
+                <div class="card">
+                    <h3 style="font-size:16px;margin-bottom:16px">Dati Broker</h3>
+                    <div class="form-group">
+                        <label>Ragione Sociale</label>
+                        <input type="text" class="form-control" id="settRagSoc" value="FIM Insurance Broker S.A.S. di Manzo Arturo & C.">
+                    </div>
+                    <div class="form-group">
+                        <label>Indirizzo</label>
+                        <input type="text" class="form-control" id="settIndirizzo" value="Via Roma 41, 04012 Cisterna di Latina (LT)">
+                    </div>
+                    <div class="form-group">
+                        <label>RUI</label>
+                        <input type="text" class="form-control" id="settRui" value="Sez. B - N. B000405449">
+                    </div>
+                    <div class="form-group">
+                        <label>IBAN</label>
+                        <input type="text" class="form-control" id="settIban" value="IT89F0306939490100000008302">
+                    </div>
+                    <button class="btn btn-primary" onclick="saveBrokerSettings()">Salva Dati Broker</button>
+                </div>
+                <div class="card">
+                    <h3 style="font-size:16px;margin-bottom:16px">Database</h3>
+                    <p style="font-size:13px;color:var(--fim-text-light);margin-bottom:12px">Gestione dati e manutenzione</p>
+                    <button class="btn btn-secondary" onclick="exportDatabase()">Esporta Backup JSON</button>
+                    <button class="btn btn-secondary" style="margin-left:8px" onclick="showDbStats()">Statistiche DB</button>
+                </div>
+            </div>
+
+        </div><!-- /page-content -->
+    </div><!-- /main-content -->
+</div><!-- /app-layout -->
+
+<!-- ============================================================
+     MODALS
+     ============================================================ -->
+
+<!-- Modal Nuovo Cliente -->
+<div class="modal-overlay" id="modalCliente">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Nuovo Cliente</h3>
+            <button class="modal-close" onclick="closeModal('modalCliente')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Tipo</label>
+                <select class="form-control" id="cliTipo" onchange="toggleClienteFields()">
+                    <option value="privato">Privato</option>
+                    <option value="azienda">Azienda</option>
+                    <option value="professionista">Professionista</option>
+                </select>
+            </div>
+            <div id="cliPrivatoFields">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="form-group"><label>Cognome *</label><input type="text" class="form-control" id="cliCognome"></div>
+                    <div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="cliNome"></div>
+                </div>
+                <div class="form-group"><label>Codice Fiscale</label><input type="text" class="form-control" id="cliCF" maxlength="16" style="text-transform:uppercase"></div>
+                <div class="form-group"><label>Data di Nascita</label><input type="date" class="form-control" id="cliDataNascita"></div>
+            </div>
+            <div id="cliAziendaFields" style="display:none">
+                <div class="form-group"><label>Ragione Sociale *</label><input type="text" class="form-control" id="cliRagSoc"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="form-group"><label>Partita IVA</label><input type="text" class="form-control" id="cliPIVA" maxlength="11"></div>
+                    <div class="form-group"><label>PEC</label><input type="email" class="form-control" id="cliPec"></div>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="form-group"><label>Email</label><input type="email" class="form-control" id="cliEmail"></div>
+                <div class="form-group"><label>Cellulare</label><input type="tel" class="form-control" id="cliCell"></div>
+            </div>
+            <div class="form-group"><label>Indirizzo</label><input type="text" class="form-control" id="cliIndirizzo"></div>
+            <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px">
+                <div class="form-group"><label>Citta</label><input type="text" class="form-control" id="cliCitta"></div>
+                <div class="form-group"><label>CAP</label><input type="text" class="form-control" id="cliCap" maxlength="5"></div>
+                <div class="form-group"><label>Prov.</label><input type="text" class="form-control" id="cliProv" maxlength="2" style="text-transform:uppercase"></div>
+            </div>
+            <div class="form-group"><label>Note</label><textarea class="form-control" id="cliNote" rows="2"></textarea></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modalCliente')">Annulla</button>
+            <button class="btn btn-primary" onclick="saveCliente()">Salva Cliente</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- FIMA AI Chat Panel -->
+<div id="fimaPanel" class="fima-panel">
+    <div class="fima-header">
+        <div style="display:flex;align-items:center;gap:10px">
+            <div class="fima-avatar">AI</div>
+            <div>
+                <div style="font-weight:700;font-size:14px">FIMA</div>
+                <div style="font-size:11px;opacity:.7">Assistente AI Broker</div>
+            </div>
+        </div>
+        <button class="fima-close" onclick="toggleFima()">&times;</button>
+    </div>
+    <div class="fima-body" id="fimaBody">
+        <div class="fima-msg fima-ai">
+            Ciao Arturo! Sono <strong>FIMA</strong>, il tuo assistente AI per il brokeraggio assicurativo. Posso aiutarti con:
+            <ul style="margin:8px 0 0 16px;font-size:13px">
+                <li>Analisi del portafoglio</li>
+                <li>Scadenze e rinnovi</li>
+                <li>Confronto compagnie</li>
+                <li>Cross-selling clienti</li>
+                <li>Normativa IVASS</li>
+            </ul>
+        </div>
+    </div>
+    <div class="fima-quick" id="fimaQuick">
+        <button onclick="fimaAsk('Quali polizze scadono questa settimana?')">Scadenze settimana</button>
+        <button onclick="fimaAsk('Analizza il portafoglio per ramo')">Analisi portafoglio</button>
+        <button onclick="fimaAsk('Clienti con opportunita\' cross-selling')">Cross-selling</button>
+    </div>
+    <div class="fima-input">
+        <input type="text" id="fimaInput" placeholder="Chiedi a FIMA..." onkeydown="if(event.key==='Enter')sendFima()">
+        <button onclick="sendFima()" class="fima-send">&#x27A4;</button>
+    </div>
+</div>
+
+<!-- FAB: FIMA AI -->
+<button class="fab" onclick="toggleFima()" title="FIMA - Assistente AI" id="fabBtn">
+    <span style="font-size:18px;font-weight:800">AI</span>
+</button>
+
+<script>
+// ============================================================
+// FIM GESTIONALE v2 - APPLICAZIONE JAVASCRIPT
+// ============================================================
+// Connessione: Supabase (PostgreSQL cloud)
+// Accessibile da: Browser desktop, tablet, mobile, PWA
+// ============================================================
+
+// === STATO APPLICAZIONE ===
+let supabase = null;
+let currentUser = null;
+let cache = {
+    clienti: [],
+    polizze: [],
+    compagnie: [],
+    rami: [],
+    collaboratori: [],
+    sinistri: [],
+    comunicazioni: [],
+    provvigioni: []
+};
+let charts = {};
+let currentScadTab = 'critica';
+
+// === CONFIG SUPABASE (pre-configurato) ===
+const SUPABASE_URL = 'https://cdhhfyhzwhdjoafitiwf.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkaGhmeWh6d2hkam9hZml0aXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjc4NjYsImV4cCI6MjA4OTk0Mzg2Nn0.tikfiRE0dJ7RfOlvUsyo9Ei89Z28g6NBoM-LUtqakK8';
+
+// === INIT ===
+document.addEventListener('DOMContentLoaded', async () => {
+    // Carica settings salvati o usa defaults
+    const url = localStorage.getItem('fim_supabase_url') || SUPABASE_URL;
+    const key = localStorage.getItem('fim_supabase_key') || SUPABASE_ANON_KEY;
+
+    if (url && key) {
+        document.getElementById('settSupabaseUrl').value = url;
+        document.getElementById('settSupabaseKey').value = key;
+        initSupabase(url, key);
+    }
+
+    // Controlla sessione attiva
+    if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            currentUser = session.user;
+            showApp();
+        }
+    }
+
+    // PWA: registra service worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+
+    // Online/Offline detection
+    window.addEventListener('online', () => {
+        document.getElementById('offlineBar').classList.remove('show');
+        refreshAll();
+    });
+    window.addEventListener('offline', () => {
+        document.getElementById('offlineBar').classList.add('show');
+    });
+});
+
+function initSupabase(url, key) {
+    supabase = window.supabase.createClient(url, key);
+}
+
+// === AUTH ===
+async function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value;
+    const pass = document.getElementById('loginPassword').value;
+    const errDiv = document.getElementById('loginError');
+
+    // Verifica connessione Supabase
+    const url = localStorage.getItem('fim_supabase_url');
+    const key = localStorage.getItem('fim_supabase_key');
+
+    if (!url || !key) {
+        // Prima configurazione: mostra settings
+        errDiv.style.display = 'block';
+        errDiv.textContent = 'Prima configura Supabase nelle Impostazioni. Accesso demo attivato.';
+        // Demo mode
+        setTimeout(() => {
+            currentUser = { email: email, user_metadata: { nome: 'Arturo' } };
+            showApp();
+        }, 1000);
+        return;
+    }
+
+    if (!supabase) initSupabase(url, key);
+
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+        if (error) throw error;
+        currentUser = data.user;
+        showApp();
+    } catch (err) {
+        errDiv.style.display = 'block';
+        errDiv.textContent = 'Errore: ' + err.message;
+    }
+}
+
+async function handleLogout() {
+    if (confirm('Vuoi uscire?')) {
+        if (supabase) await supabase.auth.signOut();
+        currentUser = null;
+        document.getElementById('loginPage').style.display = 'flex';
+        document.getElementById('appLayout').style.display = 'none';
+    }
+}
+
+function showApp() {
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('appLayout').style.display = 'flex';
+    // Set avatar initials
+    if (currentUser?.email) {
+        const parts = currentUser.email.split('@')[0].split('.');
+        const initials = parts.map(p => p[0]?.toUpperCase() || '').join('').slice(0, 2);
+        document.getElementById('userAvatar').textContent = initials || 'AM';
+    }
+    refreshAll();
+}
+
+// === NAVIGATION ===
+function navigateTo(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + page)?.classList.add('active');
+    document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+    document.querySelector(`.sidebar-nav a[data-page="${page}"]`)?.classList.add('active');
+
+    // Close sidebar on mobile
+    document.getElementById('sidebar').classList.remove('open');
+}
+
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+}
+
+// === DATA LOADING ===
+async function refreshAll() {
+    if (!supabase) {
+        loadDemoData();
+        return;
+    }
+    try {
+        await Promise.all([
+            loadClienti(),
+            loadPolizze(),
+            loadCompagnie(),
+            loadRami(),
+            loadCollaboratori(),
+            loadSinistri(),
+            loadComunicazioni()
+        ]);
+        renderDashboard();
+        renderScadenzario();
+        toast('Dati aggiornati', 'success');
+    } catch (err) {
+        toast('Errore caricamento: ' + err.message, 'error');
+    }
+}
+
+async function loadClienti() {
+    const { data, error } = await supabase
+        .from('clienti')
+        .select('*, collaboratori(cognome, nome)')
+        .is('eliminato_il', null)
+        .order('cognome');
+    if (error) throw error;
+    cache.clienti = data || [];
+    renderClienti();
+}
+
+async function loadPolizze() {
+    const { data, error } = await supabase
+        .from('polizze')
+        .select('*, clienti(cognome, nome, ragione_sociale), compagnie(nome), rami_assicurativi(nome, codice), collaboratori(cognome, nome)')
+        .is('eliminato_il', null)
+        .order('data_scadenza', { ascending: true });
+    if (error) throw error;
+    cache.polizze = data || [];
+    renderPolizze();
+}
+
+async function loadCompagnie() {
+    const { data } = await supabase.from('compagnie').select('*').eq('attiva', true).order('nome');
+    cache.compagnie = data || [];
+}
+
+async function loadRami() {
+    const { data } = await supabase.from('rami_assicurativi').select('*').eq('attivo', true).order('nome');
+    cache.rami = data || [];
+    // Popola filtro rami
+    const sel = document.getElementById('filterRamoPolizza');
+    if (sel) {
+        sel.innerHTML = '<option value="">Tutti i rami</option>' +
+            cache.rami.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+    }
+}
+
+async function loadCollaboratori() {
+    const { data } = await supabase.from('collaboratori').select('*').order('cognome');
+    cache.collaboratori = data || [];
+    renderCollaboratori();
+    // Popola select provvigioni
+    const sel = document.getElementById('provvCollab');
+    if (sel) {
+        sel.innerHTML = '<option value="">Tutti</option>' +
+            cache.collaboratori.filter(c => c.attivo).map(c =>
+                `<option value="${c.id}">${c.cognome} ${c.nome}</option>`
+            ).join('');
+    }
+}
+
+async function loadSinistri() {
+    const { data } = await supabase
+        .from('sinistri')
+        .select('*, clienti(cognome, nome, ragione_sociale), polizze(numero_polizza)')
+        .order('data_evento', { ascending: false });
+    cache.sinistri = data || [];
+    renderSinistri();
+}
+
+async function loadComunicazioni() {
+    const { data } = await supabase
+        .from('comunicazioni')
+        .select('*')
+        .order('creato_il', { ascending: false })
+        .limit(100);
+    cache.comunicazioni = data || [];
+    renderComunicazioni();
+}
+
+// === DEMO DATA (quando Supabase non e' configurato) ===
+function loadDemoData() {
+    cache.compagnie = [
+        { id: 1, nome: 'Allianz' }, { id: 2, nome: 'Prima Assicurazioni' },
+        { id: 3, nome: 'Bene Assicurazioni' }, { id: 4, nome: 'Generali' },
+        { id: 5, nome: 'DUAL/Arch' }, { id: 6, nome: 'Genial Piu' }
+    ];
+    cache.rami = [
+        { id: 1, nome: 'RCA', codice: 'RCA' }, { id: 2, nome: 'Incendio', codice: 'INC' },
+        { id: 3, nome: 'RC Professionale', codice: 'RCP' }, { id: 4, nome: 'Vita', codice: 'VIT' },
+        { id: 5, nome: 'Infortuni', codice: 'INF' }, { id: 6, nome: 'Furto', codice: 'FUR' }
+    ];
+    cache.collaboratori = [
+        { id: 1, codice: 'COL-001', cognome: 'Rossi', nome: 'Marco', codice_rui: 'E000123456', ruolo: 'subagente', email: 'rossi@email.it', perc_provv_default: 8, attivo: true },
+        { id: 2, codice: 'COL-002', cognome: 'Bianchi', nome: 'Luca', codice_rui: 'E000789012', ruolo: 'subagente', email: 'bianchi@email.it', perc_provv_default: 7, attivo: true }
+    ];
+
+    const today = new Date();
+    const demoClienti = [];
+    const demoPolizze = [];
+    const nomi = ['Verdi Giuseppe','Russo Anna','Esposito Carlo','Romano Giulia','Colombo Paolo','Ferrari Maria','Ricci Andrea','Marino Sara','Greco Francesco','Bruno Valentina'];
+    const stati = ['attiva','attiva','attiva','attiva','attiva','scaduta','in_rinnovo','attiva','attiva','attiva'];
+
+    for (let i = 0; i < 30; i++) {
+        const n = nomi[i % nomi.length].split(' ');
+        demoClienti.push({
+            id: i + 1, tipo: 'privato', cognome: n[0], nome: n[1],
+            codice_fiscale: 'VRDGPP80A01H501' + String.fromCharCode(65 + i % 26),
+            email: n[0].toLowerCase() + '@email.it', cellulare: '333' + String(1000000 + i),
+            citta: ['Cisterna di Latina','Roma','Firenze','Latina','Velletri'][i % 5],
+            provincia: ['LT','RM','FI','LT','RM'][i % 5],
+            n_polizze_attive: Math.ceil(Math.random() * 3),
+            collaboratori: cache.collaboratori[i % 2]
+        });
+    }
+
+    for (let i = 0; i < 50; i++) {
+        const cli = demoClienti[i % demoClienti.length];
+        const comp = cache.compagnie[i % cache.compagnie.length];
+        const ramo = cache.rami[i % cache.rami.length];
+        const collab = cache.collaboratori[i % cache.collaboratori.length];
+        const scadGG = Math.floor(Math.random() * 120) - 15;
+        const scad = new Date(today); scad.setDate(scad.getDate() + scadGG);
+        const effetto = new Date(scad); effetto.setFullYear(effetto.getFullYear() - 1);
+        const premio = Math.round((200 + Math.random() * 2000) * 100) / 100;
+
+        demoPolizze.push({
+            id: i + 1,
+            numero_polizza: comp.nome.substring(0, 3).toUpperCase() + '-' + String(2024000 + i),
+            cliente_id: cli.id,
+            compagnia_id: comp.id,
+            ramo_id: ramo.id,
+            collaboratore_id: collab.id,
+            data_effetto: effetto.toISOString().slice(0, 10),
+            data_scadenza: scad.toISOString().slice(0, 10),
+            data_emissione: effetto.toISOString().slice(0, 10),
+            premio_lordo: premio,
+            stato: scadGG < 0 ? 'scaduta' : stati[i % stati.length],
+            frazionamento: 'annuale',
+            dettagli_ramo: ramo.codice === 'RCA' ? { targa: 'AB' + String(100 + i) + 'CD' } : {},
+            clienti: { cognome: cli.cognome, nome: cli.nome, ragione_sociale: null },
+            compagnie: { nome: comp.nome },
+            rami_assicurativi: { nome: ramo.nome, codice: ramo.codice },
+            collaboratori: { cognome: collab.cognome, nome: collab.nome }
+        });
+    }
+
+    cache.clienti = demoClienti;
+    cache.polizze = demoPolizze;
+    cache.sinistri = [
+        { id: 1, numero_sinistro: 'SIN-2026-001', polizza_id: 1, cliente_id: 1, data_evento: '2026-03-01', tipo_sinistro: 'rca_attivo', riserva: 5000, stato: 'aperto', clienti: { cognome: 'Verdi', nome: 'Giuseppe' }, polizze: { numero_polizza: 'ALL-2024000' } },
+        { id: 2, numero_sinistro: 'SIN-2026-002', polizza_id: 5, cliente_id: 5, data_evento: '2026-02-15', tipo_sinistro: 'furto', riserva: 12000, stato: 'in_istruttoria', clienti: { cognome: 'Colombo', nome: 'Paolo' }, polizze: { numero_polizza: 'DUA-2024004' } }
+    ];
+    cache.comunicazioni = [];
+
+    // Popola filtri
+    const sel = document.getElementById('filterRamoPolizza');
+    if (sel) sel.innerHTML = '<option value="">Tutti i rami</option>' + cache.rami.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+    const sel2 = document.getElementById('provvCollab');
+    if (sel2) sel2.innerHTML = '<option value="">Tutti</option>' + cache.collaboratori.map(c => `<option value="${c.id}">${c.cognome} ${c.nome}</option>`).join('');
+
+    // Popola periodi provvigioni
+    const selP = document.getElementById('provvPeriodo');
+    if (selP) {
+        const now = new Date();
+        selP.innerHTML = '';
+        for (let m = 0; m < 6; m++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+            const val = d.toISOString().slice(0, 7);
+            selP.innerHTML += `<option value="${val}">${d.toLocaleString('it-IT', { month: 'long', year: 'numeric' })}</option>`;
+        }
+    }
+
+    renderClienti();
+    renderPolizze();
+    renderCollaboratori();
+    renderSinistri();
+    renderComunicazioni();
+    renderDashboard();
+    renderScadenzario();
+}
+
+// === RENDERERS ===
+function formatCurrency(val) {
+    return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(val || 0);
+}
+function formatDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString('it-IT');
+}
+function clienteName(c) {
+    if (!c) return '-';
+    if (c.ragione_sociale) return c.ragione_sociale;
+    return (c.cognome || '') + ' ' + (c.nome || '');
+}
+function esc(s) { return (s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function renderDashboard() {
+    const attive = cache.polizze.filter(p => p.stato === 'attiva');
+    const today = new Date();
+    const in30 = attive.filter(p => {
+        const d = new Date(p.data_scadenza);
+        const diff = (d - today) / 86400000;
+        return diff >= 0 && diff <= 30;
+    });
+
+    document.getElementById('kpiPolizzeAttive').textContent = attive.length;
+    document.getElementById('kpiPremiTotali').textContent = formatCurrency(attive.reduce((s, p) => s + (p.premio_lordo || 0), 0));
+    document.getElementById('kpiClienti').textContent = cache.clienti.length;
+    document.getElementById('kpiScadenze30').textContent = in30.length;
+    document.getElementById('kpiSinistriAperti').textContent = cache.sinistri.filter(s => s.stato === 'aperto' || s.stato === 'in_istruttoria').length;
+
+    // Provvigioni mese (stima)
+    const provvStima = attive.reduce((s, p) => s + ((p.premio_lordo || 0) * 0.12), 0) / 12;
+    document.getElementById('kpiProvvMese').textContent = formatCurrency(provvStima);
+
+    // Badge scadenze
+    document.getElementById('badgeScadenze').textContent = in30.length;
+
+    // Notifiche
+    document.getElementById('notifDot').style.display = in30.length > 0 ? 'block' : 'none';
+
+    // Subtitle
+    document.getElementById('dashSubtitle').textContent =
+        `Aggiornato: ${new Date().toLocaleString('it-IT')}`;
+
+    // Charts
+    renderCharts(attive);
+
+    // Scadenze imminenti dashboard
+    const body = document.getElementById('dashScadenzeBody');
+    body.innerHTML = in30.sort((a, b) => new Date(a.data_scadenza) - new Date(b.data_scadenza))
+        .slice(0, 8).map(p => {
+            const gg = Math.ceil((new Date(p.data_scadenza) - today) / 86400000);
+            const sem = gg <= 7 ? 'rosso' : gg <= 30 ? 'giallo' : 'verde';
+            return `<tr>
+                <td><span class="semaforo ${sem}"></span></td>
+                <td>${esc(clienteName(p.clienti))}</td>
+                <td>${esc(p.numero_polizza)}</td>
+                <td>${esc(p.compagnie?.nome)}</td>
+                <td>${esc(p.rami_assicurativi?.nome)}</td>
+                <td>${formatDate(p.data_scadenza)}</td>
+                <td>${formatCurrency(p.premio_lordo)}</td>
+            </tr>`;
+        }).join('');
+}
+
+function renderCharts(attive) {
+    // Destroy existing
+    Object.values(charts).forEach(c => c.destroy?.());
+    charts = {};
+
+    // Polizze per ramo
+    const ramiCount = {};
+    attive.forEach(p => {
+        const r = p.rami_assicurativi?.nome || 'Altro';
+        ramiCount[r] = (ramiCount[r] || 0) + 1;
+    });
+    const ramiColors = ['#00C4B4', '#1A3A5C', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#10B981', '#F97316'];
+    charts.rami = new Chart(document.getElementById('chartRami'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(ramiCount),
+            datasets: [{ data: Object.values(ramiCount), backgroundColor: ramiColors.slice(0, Object.keys(ramiCount).length) }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 10, font: { size: 12 } } } }
+        }
+    });
+
+    // Premi per compagnia
+    const compPremi = {};
+    attive.forEach(p => {
+        const c = p.compagnie?.nome || 'Altra';
+        compPremi[c] = (compPremi[c] || 0) + (p.premio_lordo || 0);
+    });
+    const sorted = Object.entries(compPremi).sort((a, b) => b[1] - a[1]);
+    charts.compagnie = new Chart(document.getElementById('chartCompagnie'), {
+        type: 'bar',
+        data: {
+            labels: sorted.map(s => s[0]),
+            datasets: [{ label: 'Premi EUR', data: sorted.map(s => s[1]), backgroundColor: '#00C4B4', borderRadius: 6 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { callback: v => formatCurrency(v) } }
+            }
+        }
+    });
+}
+
+function renderClienti() {
+    const body = document.getElementById('clientiBody');
+    body.innerHTML = cache.clienti.map(c => `<tr onclick="viewCliente(${c.id})">
+        <td><strong>${esc(clienteName(c))}</strong></td>
+        <td>${esc(c.codice_fiscale || c.partita_iva || '-')}</td>
+        <td>${esc(c.email || '-')}</td>
+        <td>${esc(c.cellulare || '-')}</td>
+        <td>${c.n_polizze_attive || 0}</td>
+        <td>${c.collaboratori ? esc(c.collaboratori.cognome + ' ' + c.collaboratori.nome) : '-'}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty-state"><h3>Nessun cliente</h3></td></tr>';
+}
+
+function renderPolizze() {
+    const body = document.getElementById('polizzeBody');
+    body.innerHTML = cache.polizze.map(p => {
+        const statoBadge = {
+            'attiva': 'badge-success', 'scaduta': 'badge-danger',
+            'in_rinnovo': 'badge-warning', 'annullata': 'badge-default',
+            'sospesa': 'badge-info', 'disdettata': 'badge-danger'
+        };
+        return `<tr onclick="viewPolizza(${p.id})">
+            <td><strong>${esc(p.numero_polizza)}</strong></td>
+            <td>${esc(clienteName(p.clienti))}</td>
+            <td>${esc(p.compagnie?.nome)}</td>
+            <td>${esc(p.rami_assicurativi?.nome)}</td>
+            <td>${formatDate(p.data_effetto)}</td>
+            <td>${formatDate(p.data_scadenza)}</td>
+            <td>${formatCurrency(p.premio_lordo)}</td>
+            <td><span class="badge ${statoBadge[p.stato] || 'badge-default'}">${p.stato}</span></td>
+        </tr>`;
+    }).join('');
+}
+
+function renderScadenzario() {
+    const today = new Date();
+    let polizze = cache.polizze.filter(p => p.stato === 'attiva' || p.stato === 'in_rinnovo');
+
+    polizze = polizze.map(p => {
+        const scad = new Date(p.data_scadenza);
+        const gg = Math.ceil((scad - today) / 86400000);
+        let sem = 'verde';
+        if (gg <= 0) sem = 'rosso';
+        else if (gg <= 7) sem = 'rosso';
+        else if (gg <= 30) sem = 'arancio';
+        else if (gg <= 60) sem = 'giallo';
+        return { ...p, gg, sem };
+    }).sort((a, b) => a.gg - b.gg);
+
+    if (currentScadTab === 'critica') polizze = polizze.filter(p => p.gg <= 7);
+    else if (currentScadTab === 'urgente') polizze = polizze.filter(p => p.gg > 7 && p.gg <= 30);
+    else if (currentScadTab === 'attenzione') polizze = polizze.filter(p => p.gg > 30 && p.gg <= 60);
+
+    document.getElementById('scadenzarioBody').innerHTML = polizze.map(p =>
+        `<tr class="scad-row-${p.sem === 'rosso' ? 'critica' : p.sem === 'arancio' ? 'urgente' : 'attenzione'}">
+            <td><span class="semaforo ${p.sem}"></span></td>
+            <td><strong>${p.gg}</strong></td>
+            <td>${esc(clienteName(p.clienti))}</td>
+            <td>${esc(p.numero_polizza)}</td>
+            <td>${esc(p.compagnie?.nome)}</td>
+            <td>${esc(p.rami_assicurativi?.nome)}</td>
+            <td>${formatDate(p.data_scadenza)}</td>
+            <td>${formatCurrency(p.premio_lordo)}</td>
+            <td><button class="btn btn-sm btn-primary" onclick="event.stopPropagation();handleRinnovo(${p.id})">Rinnova</button></td>
+        </tr>`
+    ).join('') || '<tr><td colspan="9"><div class="empty-state"><h3>Nessuna scadenza</h3></div></td></tr>';
+}
+
+function renderCollaboratori() {
+    const body = document.getElementById('collaboratoriBody');
+    body.innerHTML = cache.collaboratori.map(c => `<tr>
+        <td><strong>${esc(c.codice)}</strong></td>
+        <td>${esc(c.cognome)} ${esc(c.nome)}</td>
+        <td>${esc(c.codice_rui || '-')}</td>
+        <td><span class="badge badge-info">${c.ruolo}</span></td>
+        <td>${esc(c.email || '-')}</td>
+        <td>${c.perc_provv_default}%</td>
+        <td><span class="badge ${c.attivo ? 'badge-success' : 'badge-danger'}">${c.attivo ? 'Attivo' : 'Inattivo'}</span></td>
+    </tr>`).join('');
+}
+
+function renderSinistri() {
+    const body = document.getElementById('sinistriBody');
+    body.innerHTML = cache.sinistri.map(s => {
+        const statoBadge = { 'aperto': 'badge-danger', 'in_istruttoria': 'badge-warning', 'liquidato': 'badge-success', 'respinto': 'badge-default', 'chiuso': 'badge-default' };
+        return `<tr>
+            <td><strong>${esc(s.numero_sinistro || '-')}</strong></td>
+            <td>${esc(clienteName(s.clienti))}</td>
+            <td>${esc(s.polizze?.numero_polizza || '-')}</td>
+            <td>${formatDate(s.data_evento)}</td>
+            <td>${esc(s.tipo_sinistro || '-')}</td>
+            <td>${formatCurrency(s.riserva)}</td>
+            <td><span class="badge ${statoBadge[s.stato] || 'badge-default'}">${s.stato}</span></td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="7"><div class="empty-state"><h3>Nessun sinistro</h3></div></td></tr>';
+}
+
+function renderComunicazioni() {
+    const body = document.getElementById('comunicazioniBody');
+    body.innerHTML = cache.comunicazioni.map(c => {
+        const statoBadge = { 'programmato': 'badge-info', 'inviato': 'badge-success', 'errore': 'badge-danger' };
+        return `<tr>
+            <td>${c.canale === 'email' ? '&#x2709;' : '&#x1F4F1;'} ${c.canale}</td>
+            <td>${esc(c.tipo || '-')}</td>
+            <td>${esc(c.destinatario || '-')}</td>
+            <td>${esc(c.oggetto || '-')}</td>
+            <td>${formatDate(c.data_programmata || c.creato_il)}</td>
+            <td><span class="badge ${statoBadge[c.stato] || 'badge-default'}">${c.stato}</span></td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="6"><div class="empty-state"><h3>Nessuna comunicazione</h3></div></td></tr>';
+}
+
+// === FILTERS ===
+function filterClienti() {
+    const q = document.getElementById('searchClienti').value.toLowerCase();
+    const rows = document.querySelectorAll('#clientiBody tr');
+    rows.forEach(r => {
+        r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+function filterPolizze() {
+    const q = document.getElementById('searchPolizze').value.toLowerCase();
+    const stato = document.getElementById('filterStatoPolizza').value;
+    const ramo = document.getElementById('filterRamoPolizza').value;
+
+    let filtered = cache.polizze;
+    if (q) filtered = filtered.filter(p =>
+        (p.numero_polizza || '').toLowerCase().includes(q) ||
+        clienteName(p.clienti).toLowerCase().includes(q) ||
+        (p.compagnie?.nome || '').toLowerCase().includes(q)
+    );
+    if (stato) filtered = filtered.filter(p => p.stato === stato);
+    if (ramo) filtered = filtered.filter(p => p.ramo_id === parseInt(ramo));
+
+    document.getElementById('polizzeBody').innerHTML = filtered.map(p => {
+        const statoBadge = { 'attiva': 'badge-success', 'scaduta': 'badge-danger', 'in_rinnovo': 'badge-warning', 'annullata': 'badge-default' };
+        return `<tr onclick="viewPolizza(${p.id})">
+            <td><strong>${esc(p.numero_polizza)}</strong></td>
+            <td>${esc(clienteName(p.clienti))}</td>
+            <td>${esc(p.compagnie?.nome)}</td>
+            <td>${esc(p.rami_assicurativi?.nome)}</td>
+            <td>${formatDate(p.data_effetto)}</td>
+            <td>${formatDate(p.data_scadenza)}</td>
+            <td>${formatCurrency(p.premio_lordo)}</td>
+            <td><span class="badge ${statoBadge[p.stato] || 'badge-default'}">${p.stato}</span></td>
+        </tr>`;
+    }).join('');
+}
+
+function setScadTab(el, tab) {
+    currentScadTab = tab;
+    document.querySelectorAll('#page-scadenzario .tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    renderScadenzario();
+}
+
+function setComTab(el, filter) {
+    document.querySelectorAll('#page-comunicazioni .tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    const rows = document.querySelectorAll('#comunicazioniBody tr');
+    rows.forEach(r => {
+        if (filter === 'tutte') { r.style.display = ''; return; }
+        r.style.display = r.textContent.toLowerCase().includes(filter) ? '' : 'none';
+    });
+}
+
+// === SAVE OPERATIONS ===
+async function saveCliente() {
+    const tipo = document.getElementById('cliTipo').value;
+    const data = {
+        tipo,
+        cognome: document.getElementById('cliCognome').value,
+        nome: document.getElementById('cliNome').value,
+        codice_fiscale: document.getElementById('cliCF').value.toUpperCase() || null,
+        data_nascita: document.getElementById('cliDataNascita').value || null,
+        ragione_sociale: document.getElementById('cliRagSoc').value || null,
+        partita_iva: document.getElementById('cliPIVA').value || null,
+        pec: document.getElementById('cliPec').value || null,
+        email: document.getElementById('cliEmail').value || null,
+        cellulare: document.getElementById('cliCell').value || null,
+        indirizzo: document.getElementById('cliIndirizzo').value || null,
+        citta: document.getElementById('cliCitta').value || null,
+        cap: document.getElementById('cliCap').value || null,
+        provincia: document.getElementById('cliProv').value.toUpperCase() || null,
+        note: document.getElementById('cliNote').value || null
+    };
+
+    if (!supabase) {
+        data.id = cache.clienti.length + 1;
+        data.n_polizze_attive = 0;
+        cache.clienti.push(data);
+        renderClienti();
+        closeModal('modalCliente');
+        toast('Cliente salvato (demo)', 'success');
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from('clienti').insert(data);
+        if (error) throw error;
+        await loadClienti();
+        closeModal('modalCliente');
+        toast('Cliente salvato', 'success');
+    } catch (err) {
+        toast('Errore: ' + err.message, 'error');
+    }
+}
+
+// === SETTINGS ===
+function saveSettings() {
+    const url = document.getElementById('settSupabaseUrl').value.trim();
+    const key = document.getElementById('settSupabaseKey').value.trim();
+    if (!url || !key) { toast('Inserisci URL e Key', 'error'); return; }
+    localStorage.setItem('fim_supabase_url', url);
+    localStorage.setItem('fim_supabase_key', key);
+    initSupabase(url, key);
+    toast('Configurazione salvata', 'success');
+}
+
+function saveBrokerSettings() {
+    localStorage.setItem('fim_rag_soc', document.getElementById('settRagSoc').value);
+    localStorage.setItem('fim_indirizzo', document.getElementById('settIndirizzo').value);
+    localStorage.setItem('fim_rui', document.getElementById('settRui').value);
+    localStorage.setItem('fim_iban', document.getElementById('settIban').value);
+    toast('Dati broker salvati', 'success');
+}
+
+async function testConnection() {
+    if (!supabase) { toast('Configura prima Supabase', 'error'); return; }
+    try {
+        const { count, error } = await supabase.from('clienti').select('*', { count: 'exact', head: true });
+        if (error) throw error;
+        toast(`Connessione OK! ${count} clienti nel database`, 'success');
+    } catch (err) {
+        toast('Errore connessione: ' + err.message, 'error');
+    }
+}
+
+// === MODALS ===
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function toggleClienteFields() {
+    const tipo = document.getElementById('cliTipo').value;
+    document.getElementById('cliPrivatoFields').style.display = tipo === 'privato' ? '' : 'none';
+    document.getElementById('cliAziendaFields').style.display = tipo !== 'privato' ? '' : 'none';
+}
+
+// === TOASTS ===
+function toast(msg, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = 'toast toast-' + type;
+    el.innerHTML = msg;
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+}
+
+// === SEARCH ===
+function handleGlobalSearch(q) {
+    if (q.length < 2) return;
+    // Simple: navigate to clienti and filter
+    navigateTo('clienti');
+    document.getElementById('searchClienti').value = q;
+    filterClienti();
+}
+
+// === QUICK ACTIONS ===
+function showQuickActions() {
+    const actions = [
+        { label: 'Nuovo Cliente', fn: () => openModal('modalCliente') },
+        { label: 'Scadenzario', fn: () => navigateTo('scadenzario') },
+        { label: 'Aggiorna', fn: () => refreshAll() }
+    ];
+    // Simple: just rotate through actions
+    const fab = document.getElementById('fabBtn');
+    fab.textContent = fab.textContent === '+' ? '...' : '+';
+    // For now just refresh
+    refreshAll();
+}
+
+// === REPORT GENERATION ===
+function generateReport(type) {
+    toast('Generazione report ' + type + '...', 'info');
+    // Implementazione completa disponibile con Supabase
+}
+
+// === PROVVIGIONI ===
+async function loadProvvigioni() {
+    const periodo = document.getElementById('provvPeriodo')?.value;
+    const collabId = document.getElementById('provvCollab')?.value;
+    if (!supabase || !periodo) return;
+
+    let query = supabase.from('provvigioni_log')
+        .select('*, collaboratori(cognome, nome), polizze(numero_polizza)')
+        .eq('periodo', periodo);
+    if (collabId) query = query.eq('collaboratore_id', parseInt(collabId));
+
+    const { data } = await query.order('creato_il', { ascending: false });
+    cache.provvigioni = data || [];
+
+    const tot = data?.reduce((s, p) => s + (p.importo || 0), 0) || 0;
+    document.getElementById('provvTotale').textContent = formatCurrency(tot);
+    document.getElementById('provvPolizze').textContent = data?.length || 0;
+    document.getElementById('provvMedia').textContent = formatCurrency(data?.length ? tot / data.length : 0);
+
+    document.getElementById('provvigioniBody').innerHTML = (data || []).map(p =>
+        `<tr>
+            <td>${p.collaboratori ? esc(p.collaboratori.cognome + ' ' + p.collaboratori.nome) : '-'}</td>
+            <td>${p.polizze ? esc(p.polizze.numero_polizza) : '-'}</td>
+            <td>${formatCurrency(p.imponibile)}</td>
+            <td>${p.percentuale}%</td>
+            <td><strong>${formatCurrency(p.importo)}</strong></td>
+            <td>${p.periodo}</td>
+            <td><span class="badge badge-info">${p.tipo}</span></td>
+        </tr>`
+    ).join('');
+}
+
+function exportProvvigioni() {
+    toast('Export CSV provvigioni...', 'info');
+}
+
+// === PLACEHOLDER FUNCTIONS ===
+function viewCliente(id) { toast('Dettaglio cliente #' + id, 'info'); }
+function viewPolizza(id) { toast('Dettaglio polizza #' + id, 'info'); }
+function handleRinnovo(id) { toast('Avvio rinnovo polizza #' + id, 'info'); }
+function exportDatabase() { toast('Export database...', 'info'); }
+function showDbStats() {
+    toast(`DB: ${cache.clienti.length} clienti, ${cache.polizze.length} polizze, ${cache.sinistri.length} sinistri`, 'info');
+}
+
+// ============================================================
+// FIMA - AGENTE AI ASSISTENTE BROKER
+// ============================================================
+
+let fimaOpen = false;
+
+function toggleFima() {
+    fimaOpen = !fimaOpen;
+    document.getElementById('fimaPanel').classList.toggle('open', fimaOpen);
+    const fab = document.getElementById('fabBtn');
+    fab.innerHTML = fimaOpen ? '<span style="font-size:16px">&times;</span>' : '<span style="font-size:18px;font-weight:800">AI</span>';
+    if (fimaOpen) document.getElementById('fimaInput').focus();
+}
+
+function fimaAsk(question) {
+    document.getElementById('fimaInput').value = question;
+    sendFima();
+}
+
+function addFimaMsg(text, isUser = false) {
+    const body = document.getElementById('fimaBody');
+    const div = document.createElement('div');
+    div.className = 'fima-msg ' + (isUser ? 'fima-user' : 'fima-ai');
+    div.innerHTML = text;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+    return div;
+}
+
+function showFimaTyping() {
+    const body = document.getElementById('fimaBody');
+    const div = document.createElement('div');
+    div.className = 'fima-msg fima-ai fima-typing';
+    div.id = 'fimaTyping';
+    div.innerHTML = '<span></span><span></span><span></span>';
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+}
+
+function removeFimaTyping() {
+    document.getElementById('fimaTyping')?.remove();
+}
+
+async function sendFima() {
+    const input = document.getElementById('fimaInput');
+    const q = input.value.trim();
+    if (!q) return;
+    input.value = '';
+
+    addFimaMsg(q, true);
+    showFimaTyping();
+
+    // Nascondi quick buttons dopo prima domanda
+    document.getElementById('fimaQuick').style.display = 'none';
+
+    // Prepara contesto dal database
+    const context = buildFimaContext(q);
+
+    try {
+        const response = await callFimaAI(q, context);
+        removeFimaTyping();
+        addFimaMsg(response);
+    } catch (err) {
+        removeFimaTyping();
+        // Fallback: analisi locale intelligente
+        const localResponse = fimaLocalAnalysis(q);
+        addFimaMsg(localResponse);
+    }
+}
+
+function buildFimaContext(question) {
+    const today = new Date();
+    const attive = cache.polizze.filter(p => p.stato === 'attiva');
+
+    // Scadenze prossime
+    const scadenze7 = attive.filter(p => {
+        const d = new Date(p.data_scadenza);
+        return (d - today) / 86400000 >= 0 && (d - today) / 86400000 <= 7;
+    });
+    const scadenze30 = attive.filter(p => {
+        const d = new Date(p.data_scadenza);
+        return (d - today) / 86400000 >= 0 && (d - today) / 86400000 <= 30;
+    });
+
+    // Rami
+    const perRamo = {};
+    const premiPerRamo = {};
+    attive.forEach(p => {
+        const r = p.rami_assicurativi?.nome || 'Altro';
+        perRamo[r] = (perRamo[r] || 0) + 1;
+        premiPerRamo[r] = (premiPerRamo[r] || 0) + (p.premio_lordo || 0);
+    });
+
+    // Compagnie
+    const perCompagnia = {};
+    attive.forEach(p => {
+        const c = p.compagnie?.nome || 'Altra';
+        perCompagnia[c] = (perCompagnia[c] || 0) + (p.premio_lordo || 0);
+    });
+
+    // Clienti mono-polizza (cross-selling)
+    const clientiPolizzeCount = {};
+    attive.forEach(p => {
+        const cid = p.cliente_id;
+        clientiPolizzeCount[cid] = (clientiPolizzeCount[cid] || 0) + 1;
+    });
+    const monoPolizza = Object.entries(clientiPolizzeCount).filter(([_, c]) => c === 1).length;
+
+    return `DATI PORTAFOGLIO FIM al ${today.toLocaleDateString('it-IT')}:
+- Polizze attive: ${attive.length}
+- Premi totali: EUR ${attive.reduce((s, p) => s + (p.premio_lordo || 0), 0).toFixed(2)}
+- Clienti: ${cache.clienti.length}
+- Scadenze 7gg: ${scadenze7.length} polizze (${scadenze7.map(p => `${clienteName(p.clienti)} - ${p.compagnie?.nome} ${p.rami_assicurativi?.nome} scade ${formatDate(p.data_scadenza)} EUR ${p.premio_lordo}`).join('; ')})
+- Scadenze 30gg: ${scadenze30.length} polizze
+- Per ramo: ${Object.entries(perRamo).map(([k, v]) => `${k}: ${v} polizze (EUR ${premiPerRamo[k]?.toFixed(0)})`).join(', ')}
+- Per compagnia: ${Object.entries(perCompagnia).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}: EUR ${v.toFixed(0)}`).join(', ')}
+- Sinistri aperti: ${cache.sinistri.filter(s => s.stato === 'aperto' || s.stato === 'in_istruttoria').length}
+- Clienti con 1 sola polizza (opportunita cross-selling): ${monoPolizza}
+- Collaboratori attivi: ${cache.collaboratori.filter(c => c.attivo).length}`;
+}
+
+async function callFimaAI(question, context) {
+    // Prova prima il proxy Vercel
+    const apiUrl = localStorage.getItem('fim_ai_proxy') || '/api/claude';
+
+    const systemPrompt = `Sei FIMA, l'assistente AI di FIM Insurance Broker S.A.S. (RUI Sez. B N. B000405449).
+Il titolare e' Arturo Manzo. Rispondi sempre in italiano, in modo conciso e professionale.
+Sei esperto di brokeraggio assicurativo italiano, normativa IVASS, IDD, e mercato italiano.
+Usa i dati del portafoglio forniti per rispondere con numeri reali.
+Formatta le risposte in HTML semplice (usa <strong>, <br>, <ul><li>).
+Mantieni le risposte brevi (max 150 parole).`;
+
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 500,
+            system: systemPrompt,
+            messages: [
+                { role: 'user', content: `${context}\n\nDOMANDA: ${question}` }
+            ]
+        })
+    });
+
+    if (!response.ok) throw new Error('API non disponibile');
+    const data = await response.json();
+    return data.content?.[0]?.text || 'Risposta non disponibile';
+}
+
+function fimaLocalAnalysis(question) {
+    const q = question.toLowerCase();
+    const today = new Date();
+    const attive = cache.polizze.filter(p => p.stato === 'attiva');
+
+    // Scadenze
+    if (q.includes('scaden') && (q.includes('settiman') || q.includes('7'))) {
+        const scad = attive.filter(p => {
+            const d = new Date(p.data_scadenza);
+            return (d - today) / 86400000 >= 0 && (d - today) / 86400000 <= 7;
+        });
+        if (scad.length === 0) return 'Nessuna polizza in scadenza nei prossimi 7 giorni.';
+        let html = `<strong>${scad.length} polizze in scadenza questa settimana:</strong><br><br>`;
+        scad.forEach(p => {
+            const gg = Math.ceil((new Date(p.data_scadenza) - today) / 86400000);
+            html += `&#x1F534; <strong>${clienteName(p.clienti)}</strong> - ${p.compagnie?.nome} ${p.rami_assicurativi?.nome}<br>`;
+            html += `&nbsp;&nbsp;Scade tra ${gg}gg (${formatDate(p.data_scadenza)}) - ${formatCurrency(p.premio_lordo)}<br><br>`;
+        });
+        html += `<em>Consiglio: contatta subito questi clienti per il rinnovo!</em>`;
+        return html;
+    }
+
+    if (q.includes('scaden') && (q.includes('mese') || q.includes('30'))) {
+        const scad = attive.filter(p => {
+            const d = new Date(p.data_scadenza);
+            return (d - today) / 86400000 >= 0 && (d - today) / 86400000 <= 30;
+        });
+        return `<strong>${scad.length} polizze in scadenza nei prossimi 30 giorni</strong><br>
+Premi totali: ${formatCurrency(scad.reduce((s, p) => s + (p.premio_lordo || 0), 0))}<br><br>
+Vai allo <strong>Scadenzario</strong> per il dettaglio completo.`;
+    }
+
+    // Analisi portafoglio
+    if (q.includes('portafoglio') || q.includes('analisi') || q.includes('ramo') || q.includes('rami')) {
+        const perRamo = {};
+        const premiPerRamo = {};
+        attive.forEach(p => {
+            const r = p.rami_assicurativi?.nome || 'Altro';
+            perRamo[r] = (perRamo[r] || 0) + 1;
+            premiPerRamo[r] = (premiPerRamo[r] || 0) + (p.premio_lordo || 0);
+        });
+        let html = `<strong>Analisi Portafoglio FIM</strong><br>
+${attive.length} polizze attive - ${formatCurrency(attive.reduce((s, p) => s + (p.premio_lordo || 0), 0))} premi totali<br><br>`;
+
+        const sorted = Object.entries(perRamo).sort((a, b) => premiPerRamo[b[0]] - premiPerRamo[a[0]]);
+        sorted.forEach(([ramo, count]) => {
+            const perc = ((premiPerRamo[ramo] / attive.reduce((s, p) => s + (p.premio_lordo || 0), 0)) * 100).toFixed(1);
+            html += `<strong>${ramo}</strong>: ${count} polizze - ${formatCurrency(premiPerRamo[ramo])} (${perc}%)<br>`;
+        });
+
+        return html;
+    }
+
+    // Cross-selling
+    if (q.includes('cross') || q.includes('opportunit')) {
+        const clientiPolizze = {};
+        const clientiRami = {};
+        attive.forEach(p => {
+            const cid = p.cliente_id;
+            clientiPolizze[cid] = (clientiPolizze[cid] || 0) + 1;
+            if (!clientiRami[cid]) clientiRami[cid] = new Set();
+            clientiRami[cid].add(p.rami_assicurativi?.nome || 'Altro');
+        });
+        const mono = Object.entries(clientiPolizze).filter(([_, c]) => c === 1);
+        let html = `<strong>Opportunita di Cross-selling</strong><br><br>`;
+        html += `&#x1F4A1; <strong>${mono.length} clienti con 1 sola polizza</strong> - potenziale immediato<br><br>`;
+
+        // Mostra primi 5
+        const monoClienti = mono.slice(0, 5).map(([cid]) =>
+            cache.clienti.find(c => c.id == cid)
+        ).filter(Boolean);
+        monoClienti.forEach(c => {
+            const pol = attive.find(p => p.cliente_id === c.id);
+            html += `&#x2022; <strong>${clienteName(c)}</strong> - ha solo ${pol?.rami_assicurativi?.nome || 'una polizza'}<br>`;
+        });
+
+        if (mono.length > 5) html += `<br>... e altri ${mono.length - 5} clienti<br>`;
+        html += `<br><em>Suggerimento: proponi RC Professionale ai clienti con solo RCA, e Infortuni ai clienti con solo Incendio.</em>`;
+        return html;
+    }
+
+    // Compagnie
+    if (q.includes('compagni') || q.includes('partner')) {
+        const perComp = {};
+        attive.forEach(p => {
+            const c = p.compagnie?.nome || 'Altra';
+            perComp[c] = (perComp[c] || 0) + (p.premio_lordo || 0);
+        });
+        let html = `<strong>Distribuzione per Compagnia</strong><br><br>`;
+        Object.entries(perComp).sort((a, b) => b[1] - a[1]).forEach(([comp, premi]) => {
+            const perc = ((premi / attive.reduce((s, p) => s + (p.premio_lordo || 0), 0)) * 100).toFixed(1);
+            html += `<strong>${comp}</strong>: ${formatCurrency(premi)} (${perc}%)<br>`;
+        });
+        return html;
+    }
+
+    // Default
+    return `Grazie per la domanda! Al momento funziono in modalita' locale (senza API Claude).<br><br>
+Posso rispondere a:<br>
+&#x2022; <strong>Scadenze</strong> settimana/mese<br>
+&#x2022; <strong>Analisi portafoglio</strong> per ramo<br>
+&#x2022; <strong>Cross-selling</strong> opportunita<br>
+&#x2022; <strong>Compagnie</strong> distribuzione<br><br>
+<em>Per risposte avanzate, configura l'API Anthropic nelle Impostazioni.</em>`;
+}
+</script>
+
+</body>
+</html>

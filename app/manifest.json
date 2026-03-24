@@ -1,0 +1,20 @@
+{
+    "name": "FIM Gestionale - Insurance Broker",
+    "short_name": "FIM Gestionale",
+    "description": "Gestionale assicurativo FIM Insurance Broker",
+    "start_url": "/app/index.html",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#1A3A5C",
+    "theme_color": "#1A3A5C",
+    "categories": ["business", "productivity"],
+    "lang": "it",
+    "icons": [
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%231A3A5C'/><text x='256' y='340' font-size='240' font-weight='bold' text-anchor='middle' fill='white' font-family='Arial'>FIM</text></svg>",
+            "sizes": "512x512",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}

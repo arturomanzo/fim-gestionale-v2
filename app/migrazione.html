@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIM - Migrazione Firebase → Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root { --navy: #1A3A5C; --teal: #00C4B4; --bg: #F0F4F8; --card: #fff; --border: #E2E8F0; --text: #1E293B; --text-light: #64748B; --success: #10B981; --danger: #EF4444; --warning: #F59E0B; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        .header { background: var(--navy); color: #fff; padding: 20px 32px; display: flex; align-items: center; gap: 16px; }
+        .header .logo { width: 44px; height: 44px; background: var(--teal); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; color: var(--navy); }
+        .header h1 { font-size: 20px; } .header small { opacity: .6; font-size: 13px; }
+        .container { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+        .card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .card h2 { font-size: 18px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+        .card h2 .step { background: var(--teal); color: var(--navy); width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; flex-shrink: 0; }
+        .card p { font-size: 14px; color: var(--text-light); margin-bottom: 16px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        label { font-size: 13px; font-weight: 600; color: var(--text-light); display: block; margin-bottom: 4px; }
+        input, select, textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; }
+        input:focus, textarea:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,196,180,.15); }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: all .2s; }
+        .btn-primary { background: var(--teal); color: var(--navy); } .btn-primary:hover { background: #00A89A; }
+        .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin: 12px 0; }
+        .progress-fill { height: 100%; background: var(--teal); border-radius: 4px; transition: width .3s; width: 0; }
+        .log { background: #0F172A; color: #94A3B8; border-radius: 8px; padding: 16px; font-family: 'Consolas', monospace; font-size: 13px; max-height: 300px; overflow-y: auto; line-height: 1.8; }
+        .log .ok { color: var(--success); } .log .err { color: var(--danger); } .log .warn { color: var(--warning); } .log .info { color: #60A5FA; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+        .stat { text-align: center; padding: 12px; background: var(--bg); border-radius: 8px; }
+        .stat .val { font-size: 28px; font-weight: 800; color: var(--navy); } .stat .lbl { font-size: 12px; color: var(--text-light); }
+        .badge { display: inline-flex; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+        .badge-ok { background: #D1FAE5; color: #059669; } .badge-err { background: #FEE2E2; color: #DC2626; } .badge-wait { background: #FEF3C7; color: #D97706; }
+        .hidden { display: none; }
+        .file-drop { border: 2px dashed var(--border); border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all .2s; }
+        .file-drop:hover, .file-drop.dragover { border-color: var(--teal); background: rgba(0,196,180,.05); }
+        .file-drop input { display: none; }
+        @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo">FIM</div>
+    <div>
+        <h1>Migrazione Firebase → Supabase</h1>
+        <small>Trasferisci tutti i dati del gestionale v1 nel nuovo database PostgreSQL</small>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- STEP 1: Connessione Supabase -->
+    <div class="card" id="step1">
+        <h2><span class="step">1</span> Connessione Supabase</h2>
+        <p>Inserisci le credenziali del tuo progetto Supabase (le trovi in Project Settings > API)</p>
+        <div class="form-row">
+            <div><label>Project URL</label><input type="text" id="sbUrl" placeholder="https://xxxxx.supabase.co"></div>
+            <div><label>Service Role Key (secret)</label><input type="password" id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIs..."></div>
+        </div>
+        <button class="btn btn-primary" onclick="testSupabase()">Testa Connessione</button>
+        <span id="connStatus" style="margin-left:12px;font-size:13px"></span>
+    </div>
+
+    <!-- STEP 2: Verifica Schema -->
+    <div class="card" id="step2">
+        <h2><span class="step">2</span> Verifica Schema Database</h2>
+        <p>Controlla che le tabelle siano state create eseguendo <code>001_schema_completo.sql</code> nel SQL Editor di Supabase</p>
+        <button class="btn btn-secondary" onclick="checkSchema()">Verifica Tabelle</button>
+        <div id="schemaResult" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <!-- STEP 3: Export Firebase -->
+    <div class="card" id="step3">
+        <h2><span class="step">3</span> Importa Dati Firebase</h2>
+        <p>Esporta il database Firebase (Console > Realtime Database > ... > Esporta JSON) e caricalo qui</p>
+        <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
+            <input type="file" id="fileInput" accept=".json" onchange="handleFile(this.files[0])">
+            <div style="font-size:36px;margin-bottom:8px;opacity:.4">&#x1F4C1;</div>
+            <div style="font-size:15px;font-weight:600">Trascina il file JSON qui</div>
+            <div style="font-size:13px;color:var(--text-light);margin-top:4px">oppure clicca per selezionare</div>
+        </div>
+        <div id="fileInfo" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <!-- STEP 4: Anteprima -->
+    <div class="card hidden" id="step4">
+        <h2><span class="step">4</span> Anteprima Dati</h2>
+        <p>Riepilogo dei dati trovati nel file Firebase</p>
+        <div class="stats" id="previewStats"></div>
+        <div id="previewDetails" style="margin-top:12px"></div>
+    </div>
+
+    <!-- STEP 5: Migrazione -->
+    <div class="card hidden" id="step5">
+        <h2><span class="step">5</span> Esegui Migrazione</h2>
+        <p>Trasferisci i dati nel database Supabase. Il processo e' sicuro: usa UPSERT (inserisce o aggiorna, non duplica).</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="migCollaboratori" checked> Collaboratori
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="migClienti" checked> Clienti
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="migPolizze" checked> Polizze
+            </label>
+        </div>
+        <button class="btn btn-primary" id="btnMigra" onclick="startMigration()">Avvia Migrazione</button>
+        <button class="btn btn-secondary" onclick="exportMappingLog()" style="margin-left:8px">Scarica Log</button>
+        <div class="progress-bar" style="margin-top:16px"><div class="progress-fill" id="migProgress"></div></div>
+        <div id="migStats" class="stats hidden"></div>
+        <div class="log hidden" id="migLog"></div>
+    </div>
+
+</div>
+
+<script>
+let sb = null;
+let firebaseData = null;
+let migrationLog = [];
+
+// Drag & drop
+const drop = document.getElementById('fileDrop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+
+// Carica settings salvati o defaults
+(() => {
+    const defaultUrl = 'https://cdhhfyhzwhdjoafitiwf.supabase.co';
+    const defaultKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkaGhmeWh6d2hkam9hZml0aXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjc4NjYsImV4cCI6MjA4OTk0Mzg2Nn0.tikfiRE0dJ7RfOlvUsyo9Ei89Z28g6NBoM-LUtqakK8';
+    const u = localStorage.getItem('fim_supabase_url') || defaultUrl;
+    const k = localStorage.getItem('fim_supabase_key') || defaultKey;
+    document.getElementById('sbUrl').value = u;
+    document.getElementById('sbKey').value = k;
+})();
+
+async function testSupabase() {
+    const url = document.getElementById('sbUrl').value.trim();
+    const key = document.getElementById('sbKey').value.trim();
+    const status = document.getElementById('connStatus');
+    if (!url || !key) { status.innerHTML = '<span class="badge badge-err">Inserisci URL e Key</span>'; return; }
+
+    try {
+        sb = window.supabase.createClient(url, key);
+        // Test con query
+        const { count, error } = await sb.from('compagnie').select('*', { count: 'exact', head: true });
+        if (error) throw error;
+        status.innerHTML = `<span class="badge badge-ok">Connesso! ${count} compagnie trovate</span>`;
+        localStorage.setItem('fim_supabase_url', url);
+        localStorage.setItem('fim_supabase_key', key);
+    } catch (err) {
+        status.innerHTML = `<span class="badge badge-err">Errore: ${err.message}</span>`;
+        sb = null;
+    }
+}
+
+async function checkSchema() {
+    const res = document.getElementById('schemaResult');
+    res.classList.remove('hidden');
+    if (!sb) { res.innerHTML = '<span class="badge badge-err">Prima connettiti a Supabase (Step 1)</span>'; return; }
+
+    const tables = ['compagnie', 'rami_assicurativi', 'collaboratori', 'clienti', 'polizze', 'sinistri', 'provvigioni_log', 'comunicazioni', 'adeguatezza_idd', 'documenti', 'attivita_agenti_ai', 'tabelle_provvigioni', 'workflow_scadenze'];
+    let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px">';
+    let allOk = true;
+
+    for (const t of tables) {
+        try {
+            const { count, error } = await sb.from(t).select('*', { count: 'exact', head: true });
+            if (error) throw error;
+            html += `<div style="padding:6px 10px;background:#D1FAE5;border-radius:6px;font-size:13px"><strong>${t}</strong> (${count} righe)</div>`;
+        } catch {
+            html += `<div style="padding:6px 10px;background:#FEE2E2;border-radius:6px;font-size:13px"><strong>${t}</strong> MANCANTE</div>`;
+            allOk = false;
+        }
+    }
+    html += '</div>';
+    if (allOk) html = '<span class="badge badge-ok" style="margin-bottom:8px">Tutte le 13 tabelle presenti!</span>' + html;
+    else html = '<span class="badge badge-err" style="margin-bottom:8px">Tabelle mancanti - esegui lo schema SQL</span>' + html;
+    res.innerHTML = html;
+}
+
+function handleFile(file) {
+    if (!file) return;
+    const info = document.getElementById('fileInfo');
+    info.classList.remove('hidden');
+    info.innerHTML = `<span class="badge badge-wait">Caricamento ${file.name} (${(file.size/1024).toFixed(0)} KB)...</span>`;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            firebaseData = JSON.parse(e.target.result);
+            info.innerHTML = `<span class="badge badge-ok">${file.name} caricato (${(file.size/1024).toFixed(0)} KB)</span>`;
+            analyzeFirebaseData();
+        } catch (err) {
+            info.innerHTML = `<span class="badge badge-err">File JSON non valido: ${err.message}</span>`;
+        }
+    };
+    reader.readAsText(file);
+}
+
+function analyzeFirebaseData() {
+    document.getElementById('step4').classList.remove('hidden');
+    document.getElementById('step5').classList.remove('hidden');
+
+    const d = firebaseData;
+
+    // Conta entita'
+    const collabCount = d.collaboratori ? Object.keys(d.collaboratori).length : 0;
+    const clientiCount = d.clienti ? Object.keys(d.clienti).length : 0;
+    const polizzeCount = d.polizze ? Object.keys(d.polizze).length : 0;
+
+    // Conta anche polizze dentro i clienti (struttura nidificata)
+    let polizzeNested = 0;
+    if (d.clienti) {
+        Object.values(d.clienti).forEach(c => {
+            if (c.polizze) polizzeNested += Object.keys(c.polizze).length;
+        });
+    }
+
+    // Compagnie uniche
+    const compagnie = new Set();
+    const rami = new Set();
+    const allPolizze = [];
+
+    // Raccogli da polizze top-level
+    if (d.polizze) {
+        Object.entries(d.polizze).forEach(([k, p]) => {
+            allPolizze.push({ id: k, ...p });
+            if (p.compagnia) compagnie.add(p.compagnia);
+            if (p.ramo) rami.add(p.ramo);
+        });
+    }
+    // Raccogli da clienti nidificati
+    if (d.clienti) {
+        Object.entries(d.clienti).forEach(([ck, c]) => {
+            if (c.polizze) {
+                Object.entries(c.polizze).forEach(([pk, p]) => {
+                    allPolizze.push({ id: pk, cliente_firebase_id: ck, ...p });
+                    if (p.compagnia) compagnie.add(p.compagnia);
+                    if (p.ramo) rami.add(p.ramo);
+                });
+            }
+        });
+    }
+
+    document.getElementById('previewStats').innerHTML = `
+        <div class="stat"><div class="val">${collabCount}</div><div class="lbl">Collaboratori</div></div>
+        <div class="stat"><div class="val">${clientiCount}</div><div class="lbl">Clienti</div></div>
+        <div class="stat"><div class="val">${allPolizze.length}</div><div class="lbl">Polizze</div></div>
+        <div class="stat"><div class="val">${compagnie.size}</div><div class="lbl">Compagnie</div></div>
+        <div class="stat"><div class="val">${rami.size}</div><div class="lbl">Rami</div></div>
+    `;
+
+    let details = '';
+    if (compagnie.size > 0) {
+        details += `<div style="margin-bottom:8px"><strong>Compagnie trovate:</strong> ${[...compagnie].join(', ')}</div>`;
+    }
+    if (rami.size > 0) {
+        details += `<div><strong>Rami trovati:</strong> ${[...rami].join(', ')}</div>`;
+    }
+    document.getElementById('previewDetails').innerHTML = details;
+
+    // Salva per migrazione
+    firebaseData._parsed = { allPolizze, compagnie: [...compagnie], rami: [...rami] };
+}
+
+async function startMigration() {
+    if (!sb) { alert('Connettiti prima a Supabase (Step 1)'); return; }
+    if (!firebaseData) { alert('Carica prima il file Firebase (Step 3)'); return; }
+
+    const btn = document.getElementById('btnMigra');
+    btn.disabled = true;
+    btn.textContent = 'Migrazione in corso...';
+
+    const logEl = document.getElementById('migLog');
+    const statsEl = document.getElementById('migStats');
+    logEl.classList.remove('hidden');
+    statsEl.classList.remove('hidden');
+    logEl.innerHTML = '';
+    migrationLog = [];
+
+    const progress = document.getElementById('migProgress');
+    let step = 0;
+    const totalSteps = 5;
+    const updateProgress = () => { step++; progress.style.width = (step / totalSteps * 100) + '%'; };
+
+    const log = (msg, cls = '') => {
+        const ts = new Date().toLocaleTimeString('it-IT');
+        logEl.innerHTML += `<div class="${cls}">[${ts}] ${msg}</div>`;
+        logEl.scrollTop = logEl.scrollHeight;
+        migrationLog.push(`[${ts}] ${msg}`);
+    };
+
+    let stats = { compagnie: 0, rami: 0, collaboratori: 0, clienti: 0, polizze: 0, errori: 0 };
+
+    try {
+        // === STEP A: Compagnie ===
+        log('Migrazione compagnie...', 'info');
+        const compagnieSet = firebaseData._parsed?.compagnie || [];
+        for (const nome of compagnieSet) {
+            const normalizzato = nome.replace(/\s*(S\.p\.A\.|s\.r\.l\.|S\.A\.S\.|Direct|Italia)\s*/gi, '').trim();
+            const codice = normalizzato.substring(0, 10).toUpperCase().replace(/\s+/g, '_');
+            const { error } = await sb.from('compagnie').upsert({
+                codice, nome, nome_normalizzato: normalizzato, tipo: 'compagnia', attiva: true
+            }, { onConflict: 'codice' });
+            if (error) { log(`  Errore compagnia "${nome}": ${error.message}`, 'err'); stats.errori++; }
+            else { stats.compagnie++; }
+        }
+        log(`  ${stats.compagnie} compagnie migrate`, 'ok');
+        updateProgress();
+
+        // Ricarica compagnie per mapping
+        const { data: compagnieDb } = await sb.from('compagnie').select('id, nome, nome_normalizzato');
+        const compMap = {};
+        (compagnieDb || []).forEach(c => {
+            compMap[c.nome.toLowerCase()] = c.id;
+            compMap[c.nome_normalizzato.toLowerCase()] = c.id;
+        });
+
+        // === STEP B: Rami ===
+        log('Verifica rami assicurativi...', 'info');
+        const { data: ramiDb } = await sb.from('rami_assicurativi').select('id, codice, nome');
+        const ramoMap = {};
+        (ramiDb || []).forEach(r => {
+            ramoMap[r.nome.toLowerCase()] = r.id;
+            ramoMap[r.codice.toLowerCase()] = r.id;
+        });
+        // Aggiungi rami mancanti
+        const ramiNuovi = (firebaseData._parsed?.rami || []).filter(r =>
+            !ramoMap[r.toLowerCase()]
+        );
+        for (const r of ramiNuovi) {
+            const codice = r.substring(0, 10).toUpperCase().replace(/\s+/g, '_');
+            const { data, error } = await sb.from('rami_assicurativi').insert({
+                codice, nome: r, categoria: 'altro', attivo: true
+            }).select().single();
+            if (!error && data) { ramoMap[r.toLowerCase()] = data.id; stats.rami++; }
+        }
+        log(`  ${stats.rami} nuovi rami aggiunti, ${Object.keys(ramoMap).length} totali`, 'ok');
+        updateProgress();
+
+        // === STEP C: Collaboratori ===
+        if (document.getElementById('migCollaboratori').checked && firebaseData.collaboratori) {
+            log('Migrazione collaboratori...', 'info');
+            const collabs = firebaseData.collaboratori;
+            for (const [uuid, c] of Object.entries(collabs)) {
+                const cognome = c.cognome || c.name?.split(' ').pop() || 'N/D';
+                const nome = c.nome || c.name?.split(' ').slice(0, -1).join(' ') || '';
+                const codice = c.codice || `COL-${String(stats.collaboratori + 1).padStart(3, '0')}`;
+
+                const { error } = await sb.from('collaboratori').upsert({
+                    uuid_firebase: uuid,
+                    codice,
+                    cognome,
+                    nome,
+                    codice_rui: c.codiceRui || c.rui || null,
+                    ruolo: c.ruolo || 'subagente',
+                    email: c.email || null,
+                    telefono: c.telefono || c.phone || null,
+                    perc_provv_default: parseFloat(c.percProvv || c.provvDefault || 7),
+                    attivo: c.attivo !== false
+                }, { onConflict: 'uuid_firebase' });
+
+                if (error) { log(`  Errore collaboratore "${cognome}": ${error.message}`, 'err'); stats.errori++; }
+                else { stats.collaboratori++; }
+            }
+            log(`  ${stats.collaboratori} collaboratori migrati`, 'ok');
+        }
+        updateProgress();
+
+        // Ricarica collaboratori per mapping
+        const { data: collabDb } = await sb.from('collaboratori').select('id, uuid_firebase, codice');
+        const collabMap = {};
+        (collabDb || []).forEach(c => {
+            if (c.uuid_firebase) collabMap[c.uuid_firebase] = c.id;
+            collabMap[c.codice] = c.id;
+        });
+
+        // === STEP D: Clienti ===
+        if (document.getElementById('migClienti').checked && firebaseData.clienti) {
+            log('Migrazione clienti...', 'info');
+            const clienti = firebaseData.clienti;
+            let i = 0;
+            for (const [uuid, c] of Object.entries(clienti)) {
+                i++;
+                if (i % 50 === 0) log(`  ... ${i} clienti processati`, 'info');
+
+                const tipo = c.tipo || (c.ragioneSociale || c.ragione_sociale ? 'azienda' : 'privato');
+                const record = {
+                    uuid_firebase: uuid,
+                    tipo,
+                    cognome: c.cognome || c.surname || null,
+                    nome: c.nome || c.name || null,
+                    codice_fiscale: (c.codiceFiscale || c.cf || c.codice_fiscale || '').toUpperCase() || null,
+                    data_nascita: c.dataNascita || c.data_nascita || null,
+                    ragione_sociale: c.ragioneSociale || c.ragione_sociale || null,
+                    partita_iva: c.partitaIva || c.piva || c.partita_iva || null,
+                    pec: c.pec || null,
+                    email: c.email || null,
+                    cellulare: c.cellulare || c.cell || c.telefono || c.phone || null,
+                    telefono: c.telefonoFisso || null,
+                    indirizzo: c.indirizzo || c.address || null,
+                    cap: c.cap || null,
+                    citta: c.citta || c.city || null,
+                    provincia: (c.provincia || c.prov || '').substring(0, 2).toUpperCase() || null,
+                    note: c.note || null,
+                    fonte_acquisizione: c.fonte || null
+                };
+
+                // Associa collaboratore
+                if (c.collaboratore) record.collaboratore_id = collabMap[c.collaboratore] || null;
+                if (c.collaboratoreId) record.collaboratore_id = collabMap[c.collaboratoreId] || null;
+
+                // Pulisci null fields
+                Object.keys(record).forEach(k => { if (record[k] === '' || record[k] === undefined) record[k] = null; });
+                // Fix data_nascita se non valida
+                if (record.data_nascita && isNaN(Date.parse(record.data_nascita))) record.data_nascita = null;
+
+                const { error } = await sb.from('clienti').upsert(record, { onConflict: 'uuid_firebase' });
+                if (error) {
+                    log(`  Errore cliente "${record.cognome || record.ragione_sociale}": ${error.message}`, 'err');
+                    stats.errori++;
+                } else { stats.clienti++; }
+            }
+            log(`  ${stats.clienti} clienti migrati`, 'ok');
+        }
+        updateProgress();
+
+        // Ricarica clienti per mapping
+        const { data: clientiDb } = await sb.from('clienti').select('id, uuid_firebase, codice_fiscale');
+        const clienteMap = {};
+        (clientiDb || []).forEach(c => {
+            if (c.uuid_firebase) clienteMap[c.uuid_firebase] = c.id;
+            if (c.codice_fiscale) clienteMap[c.codice_fiscale] = c.id;
+        });
+
+        // === STEP E: Polizze ===
+        if (document.getElementById('migPolizze').checked) {
+            log('Migrazione polizze...', 'info');
+            const allPolizze = firebaseData._parsed?.allPolizze || [];
+            let i = 0;
+            for (const p of allPolizze) {
+                i++;
+                if (i % 100 === 0) log(`  ... ${i} polizze processate`, 'info');
+
+                // Risolvi riferimenti
+                const clienteId = p.cliente_firebase_id ? clienteMap[p.cliente_firebase_id]
+                    : (p.clienteId ? clienteMap[p.clienteId] : null);
+                const compagniaId = p.compagnia ? (compMap[p.compagnia.toLowerCase()] || null) : null;
+                const ramoId = p.ramo ? (ramoMap[p.ramo.toLowerCase()] || null) : null;
+
+                if (!clienteId) {
+                    log(`  Skip polizza "${p.numero || p.id}": cliente non trovato`, 'warn');
+                    stats.errori++;
+                    continue;
+                }
+                if (!compagniaId) {
+                    log(`  Skip polizza "${p.numero || p.id}": compagnia "${p.compagnia}" non trovata`, 'warn');
+                    stats.errori++;
+                    continue;
+                }
+
+                const record = {
+                    uuid_firebase: p.id,
+                    numero_polizza: p.numero || p.numeroPolizza || p.numero_polizza || `IMP-${String(i).padStart(5, '0')}`,
+                    cliente_id: clienteId,
+                    compagnia_id: compagniaId,
+                    ramo_id: ramoId || 1,
+                    data_emissione: p.dataEmissione || p.data_emissione || p.dataEffetto || p.data_effetto || new Date().toISOString().slice(0, 10),
+                    data_effetto: p.dataEffetto || p.data_effetto || p.dataEmissione || p.data_emissione || new Date().toISOString().slice(0, 10),
+                    data_scadenza: p.dataScadenza || p.data_scadenza || new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10),
+                    premio_lordo: parseFloat(p.premioLordo || p.premio_lordo || p.premio || 0),
+                    stato: mapStato(p.stato || 'attiva'),
+                    frazionamento: p.frazionamento || 'annuale',
+                    tacito_rinnovo: p.tacitoRinnovo !== false,
+                    perc_provvigione: parseFloat(p.percProvvigione || p.provvPerc || 0) || null,
+                    note: p.note || null,
+                    dettagli_ramo: {}
+                };
+
+                // Dettagli ramo
+                if (p.targa) record.dettagli_ramo.targa = p.targa;
+                if (p.classeCU || p.classe_cu) record.dettagli_ramo.classe_cu = p.classeCU || p.classe_cu;
+                if (p.marca) record.dettagli_ramo.marca = p.marca;
+                if (p.modello) record.dettagli_ramo.modello = p.modello;
+                if (p.professione) record.dettagli_ramo.professione = p.professione;
+                if (p.fatturato) record.dettagli_ramo.fatturato = p.fatturato;
+
+                // Collaboratore
+                if (p.collaboratore) record.collaboratore_id = collabMap[p.collaboratore] || null;
+                if (p.collaboratoreId) record.collaboratore_id = collabMap[p.collaboratoreId] || null;
+
+                // Fix date non valide
+                ['data_emissione', 'data_effetto', 'data_scadenza'].forEach(f => {
+                    if (record[f] && isNaN(Date.parse(record[f]))) record[f] = new Date().toISOString().slice(0, 10);
+                });
+
+                const { error } = await sb.from('polizze').upsert(record, { onConflict: 'uuid_firebase' });
+                if (error) {
+                    log(`  Errore polizza "${record.numero_polizza}": ${error.message}`, 'err');
+                    stats.errori++;
+                } else { stats.polizze++; }
+            }
+            log(`  ${stats.polizze} polizze migrate`, 'ok');
+        }
+        updateProgress();
+
+        // === RIEPILOGO ===
+        log('', '');
+        log('========================================', 'info');
+        log('  MIGRAZIONE COMPLETATA', 'ok');
+        log('========================================', 'info');
+        log(`  Compagnie:     ${stats.compagnie}`, 'ok');
+        log(`  Rami:          ${stats.rami}`, 'ok');
+        log(`  Collaboratori: ${stats.collaboratori}`, 'ok');
+        log(`  Clienti:       ${stats.clienti}`, 'ok');
+        log(`  Polizze:       ${stats.polizze}`, 'ok');
+        log(`  Errori:        ${stats.errori}`, stats.errori > 0 ? 'err' : 'ok');
+
+        statsEl.innerHTML = `
+            <div class="stat"><div class="val">${stats.compagnie}</div><div class="lbl">Compagnie</div></div>
+            <div class="stat"><div class="val">${stats.collaboratori}</div><div class="lbl">Collaboratori</div></div>
+            <div class="stat"><div class="val">${stats.clienti}</div><div class="lbl">Clienti</div></div>
+            <div class="stat"><div class="val">${stats.polizze}</div><div class="lbl">Polizze</div></div>
+            <div class="stat"><div class="val" style="color:${stats.errori > 0 ? 'var(--danger)' : 'var(--success)'}">${stats.errori}</div><div class="lbl">Errori</div></div>
+        `;
+
+    } catch (err) {
+        log(`ERRORE CRITICO: ${err.message}`, 'err');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Avvia Migrazione';
+}
+
+function mapStato(s) {
+    const map = { 'attiva': 'attiva', 'active': 'attiva', 'scaduta': 'scaduta', 'expired': 'scaduta', 'annullata': 'annullata', 'cancelled': 'annullata', 'sospesa': 'sospesa', 'in_rinnovo': 'in_rinnovo', 'rinnovo': 'in_rinnovo' };
+    return map[(s || '').toLowerCase()] || 'attiva';
+}
+
+function exportMappingLog() {
+    const blob = new Blob([migrationLog.join('\n')], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `migrazione-fim-${new Date().toISOString().slice(0, 10)}.log`;
+    a.click();
+}
+</script>
+</body>
+</html>
