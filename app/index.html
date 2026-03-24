@@ -813,6 +813,9 @@
             <a onclick="navigateTo('agentepdf')" data-page="agentepdf">
                 <span class="nav-icon">&#x1F916;</span> Agente AI PDF
             </a>
+            <a onclick="navigateTo('analisidoc')" data-page="analisidoc">
+                <span class="nav-icon">&#x1F50D;</span> Analisi Documenti AI
+            </a>
             <a onclick="navigateTo('documenti')" data-page="documenti">
                 <span class="nav-icon">&#x1F4C4;</span> FIMA Documenti
             </a>
@@ -1345,6 +1348,76 @@
                         <div class="card" style="margin-top:12px">
                             <h3 style="font-size:14px;margin-bottom:8px">📜 Log Elaborazioni</h3>
                             <div id="agentPDFLog" style="font-size:11px;max-height:400px;overflow-y:auto;font-family:monospace;line-height:1.6"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======== ANALISI DOCUMENTI AI ======== -->
+            <div id="page-analisidoc" class="page">
+                <h1 class="page-title">Analisi Documenti AI</h1>
+                <p class="page-subtitle">Carica qualsiasi documento assicurativo: polizze, condizioni, PIP, fascicoli, appendici</p>
+
+                <!-- Upload Zone -->
+                <div class="card" id="docAIDropZone"
+                     ondrop="handleDocAIDrop(event)" ondragover="event.preventDefault();this.style.borderColor='var(--fim-accent)'"
+                     ondragleave="this.style.borderColor=''" onclick="document.getElementById('docAIFileInput').click()"
+                     style="border:2px dashed rgba(0,196,180,.3);text-align:center;padding:40px;cursor:pointer;transition:.2s;margin-bottom:16px">
+                    <div style="font-size:48px;margin-bottom:12px">🔍</div>
+                    <p style="font-size:15px;font-weight:600">Trascina qui qualsiasi documento assicurativo</p>
+                    <p style="font-size:12px;color:var(--fim-text-light);margin-top:4px">Polizze, Condizioni Contrattuali, PIP, Fascicoli Informativi, Appendici, Quietanze, Certificati</p>
+                    <p style="font-size:11px;color:var(--fim-text-light);margin-top:8px">Formato: PDF — Analisi AI con FIMA</p>
+                    <input type="file" id="docAIFileInput" accept=".pdf" style="display:none" onchange="handleDocAISelect(event)">
+                </div>
+
+                <!-- Processing -->
+                <div id="docAIProcessing" class="card" style="display:none;margin-bottom:16px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <strong id="docAIProcessingStatus" style="font-size:14px">Analisi in corso...</strong>
+                        <span id="docAIProcessingStep" style="font-size:12px;color:var(--fim-text-light)"></span>
+                    </div>
+                    <div style="background:rgba(255,255,255,.08);border-radius:6px;height:8px;overflow:hidden">
+                        <div id="docAIProgressFill" style="width:0%;height:100%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:6px;transition:width .4s ease"></div>
+                    </div>
+                    <div id="docAISteps" style="font-size:11px;color:var(--fim-text-light);margin-top:8px"></div>
+                </div>
+
+                <!-- Analysis Result -->
+                <div id="docAIResultPanel" class="card" style="display:none;margin-bottom:16px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                        <h3 style="font-size:16px;color:var(--fim-accent)">🧠 Risultato Analisi AI</h3>
+                        <div style="display:flex;gap:8px">
+                            <button class="btn btn-secondary" onclick="resetDocAI()">🔄 Nuova Analisi</button>
+                            <button class="btn btn-primary" onclick="saveDocAIResult()">💾 Salva nell'Archivio</button>
+                        </div>
+                    </div>
+                    <div id="docAIResultContent"></div>
+                </div>
+
+                <!-- Saved Documents List -->
+                <div class="card">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                        <h3 style="font-size:16px">📚 Archivio Documenti Analizzati</h3>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <input type="text" id="docAISearch" class="form-control" placeholder="Cerca documento..." oninput="renderDocumentiAIList()" style="width:200px;font-size:12px">
+                            <select id="docAIFilterType" class="form-control" onchange="renderDocumentiAIList()" style="width:160px;font-size:12px">
+                                <option value="all">Tutti i tipi</option>
+                                <option value="polizza">Polizze</option>
+                                <option value="condizioni_contrattuali">Condizioni</option>
+                                <option value="pip">PIP</option>
+                                <option value="fascicolo_informativo">Fascicolo</option>
+                                <option value="appendice">Appendice</option>
+                                <option value="quietanza">Quietanza</option>
+                                <option value="certificato">Certificato</option>
+                                <option value="altro">Altro</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="docAIList" style="font-size:13px;color:var(--fim-text-light)">
+                        <div style="text-align:center;padding:30px">
+                            <div style="font-size:40px;margin-bottom:10px">📂</div>
+                            <div>Nessun documento analizzato</div>
+                            <div style="font-size:12px">Carica un PDF per iniziare</div>
                         </div>
                     </div>
                 </div>
@@ -3928,6 +4001,402 @@ function addAgentLog(fileName, extracted, match, saved) {
         (match ? ' — ' + esc(match.message || '') : '') +
         '</div>';
     logEl.innerHTML = entry + logEl.innerHTML;
+}
+
+// ══════════════════════════════════════════════════════════════
+// ████  ANALISI DOCUMENTI AI  ████
+// ══════════════════════════════════════════════════════════════
+
+var _currentDocAI = null;
+var documentiAI = JSON.parse(localStorage.getItem('fim_documenti_ai') || '[]');
+
+// Init list on load
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(renderDocumentiAIList, 3500);
+});
+
+function handleDocAIDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    document.getElementById('docAIDropZone').style.borderColor = '';
+    var files = event.dataTransfer.files;
+    if (files.length > 0) processDocAI(files[0]);
+}
+
+function handleDocAISelect(event) {
+    var files = event.target.files;
+    if (files.length > 0) processDocAI(files[0]);
+    event.target.value = '';
+}
+
+async function processDocAI(file) {
+    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
+        toast('Seleziona un file PDF', 'error');
+        return;
+    }
+
+    var proc = document.getElementById('docAIProcessing');
+    var prog = document.getElementById('docAIProgressFill');
+    var status = document.getElementById('docAIProcessingStatus');
+    var steps = document.getElementById('docAISteps');
+    proc.style.display = 'block';
+    document.getElementById('docAIResultPanel').style.display = 'none';
+    prog.style.width = '0%';
+    prog.style.background = 'linear-gradient(90deg,#667eea,#764ba2)';
+    steps.innerHTML = '';
+
+    try {
+        // Step 1: Load PDF
+        status.textContent = 'Caricamento PDF...';
+        steps.innerHTML = '✅ File: ' + file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
+        prog.style.width = '10%';
+
+        var arrayBuffer = await file.arrayBuffer();
+        if (!window.pdfjsLib) {
+            await new Promise(function(resolve, reject) {
+                var s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                s.onload = resolve; s.onerror = reject;
+                document.head.appendChild(s);
+            });
+        }
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        var numPages = pdf.numPages;
+        steps.innerHTML += '<br>✅ PDF caricato: ' + numPages + ' pagine';
+        prog.style.width = '15%';
+
+        // Step 2: Extract text (up to 30 pages)
+        status.textContent = 'Estrazione testo...';
+        var fullText = '';
+        var maxPages = Math.min(numPages, 30);
+        for (var i = 1; i <= maxPages; i++) {
+            var page = await pdf.getPage(i);
+            var tc = await page.getTextContent();
+            var items = tc.items.filter(function(item) { return item.str && item.str.trim(); });
+            if (items.length === 0) continue;
+            var rows = [];
+            items.forEach(function(item) {
+                var y = Math.round((item.transform ? item.transform[5] : 0) * 10) / 10;
+                var x = item.transform ? item.transform[4] : 0;
+                var found = false;
+                for (var r = 0; r < rows.length; r++) {
+                    if (Math.abs(rows[r].y - y) < 3) { rows[r].items.push({ x: x, str: item.str }); found = true; break; }
+                }
+                if (!found) rows.push({ y: y, items: [{ x: x, str: item.str }] });
+            });
+            rows.sort(function(a, b) { return b.y - a.y; });
+            rows.forEach(function(row) {
+                row.items.sort(function(a, b) { return a.x - b.x; });
+                var lineText = '';
+                for (var j = 0; j < row.items.length; j++) {
+                    if (j > 0) {
+                        var gap = row.items[j].x - (row.items[j - 1].x + (row.items[j - 1].str.length * 4));
+                        lineText += gap > 30 ? '\t' : ' ';
+                    }
+                    lineText += row.items[j].str;
+                }
+                fullText += lineText + '\n';
+            });
+            fullText += '\n--- PAGINA ' + i + ' ---\n';
+            prog.style.width = (15 + (i / maxPages) * 25) + '%';
+        }
+        steps.innerHTML += '<br>✅ Testo estratto: ' + fullText.length + ' caratteri da ' + maxPages + ' pagine';
+        prog.style.width = '40%';
+
+        // Step 3: AI Analysis via FIMA proxy
+        status.textContent = 'Analisi AI con FIMA...';
+        steps.innerHTML += '<br>🤖 Invio a FIMA per analisi intelligente...';
+
+        var textForAI = fullText.length > 15000 ? fullText.substring(0, 15000) + '\n\n[...TESTO TRONCATO...]' : fullText;
+
+        var prompt = 'Sei un esperto analista assicurativo italiano. Analizza il seguente documento assicurativo e restituisci un JSON strutturato.\n\n' +
+            'DOCUMENTO:\n```\n' + textForAI + '\n```\n\n' +
+            'Rispondi SOLO con un oggetto JSON valido (senza markdown, senza ```), con questa struttura:\n' +
+            '{\n' +
+            '  "tipoDocumento": "polizza|condizioni_contrattuali|pip|fascicolo_informativo|appendice|quietanza|certificato|altro",\n' +
+            '  "tipoDocumentoLabel": "descrizione leggibile del tipo",\n' +
+            '  "compagnia": "nome compagnia assicurativa",\n' +
+            '  "prodotto": "nome prodotto/linea assicurativa",\n' +
+            '  "numPolizza": "numero polizza se presente",\n' +
+            '  "contraente": {"nome": "", "cf": "", "piva": "", "indirizzo": "", "telefono": "", "email": ""},\n' +
+            '  "assicurato": {"nome": "", "cf": ""},\n' +
+            '  "beneficiario": "se presente",\n' +
+            '  "oggetto": "breve descrizione di cosa copre (es: veicolo, immobile, attivita professionale)",\n' +
+            '  "targa": "se veicolo",\n' +
+            '  "decorrenza": "YYYY-MM-DD",\n' +
+            '  "scadenza": "YYYY-MM-DD",\n' +
+            '  "durata": "es: annuale, pluriennale 5 anni",\n' +
+            '  "frazionamento": "annuale|semestrale|trimestrale|mensile",\n' +
+            '  "premio": {"netto": 0, "imposte": 0, "ssn": 0, "lordo": 0},\n' +
+            '  "garanzie": [{"nome": "", "massimale": "", "franchigia": "", "scoperto": ""}],\n' +
+            '  "esclusioni": ["lista delle principali esclusioni"],\n' +
+            '  "clausole_speciali": ["lista clausole particolari"],\n' +
+            '  "ramo": "RCA|CVT|Incendio|Furto|RC Professionale|Vita|Infortuni|Malattia|Multirischi|Trasporti|Altro",\n' +
+            '  "sintesi": "riassunto in 2-3 frasi del documento per un broker assicurativo",\n' +
+            '  "note_importanti": "eventuali punti critici o attenzioni particolari per il broker",\n' +
+            '  "confidenza": "alta|media|bassa"\n' +
+            '}\n\nSe un campo non e presente, usa null. Date in YYYY-MM-DD. Importi come numeri. Rispondi SOLO con il JSON.';
+
+        var apiUrl = localStorage.getItem('fim_ai_proxy') || 'https://fim-gestionale-v2.vercel.app/api/claude';
+        var response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 4096,
+                messages: [{ role: 'user', content: prompt }]
+            })
+        });
+
+        if (!response.ok) throw new Error('API error ' + response.status);
+        var result = await response.json();
+        var aiText = result.content && result.content[0] ? result.content[0].text : '';
+        prog.style.width = '90%';
+
+        var jsonMatch = aiText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('FIMA non ha restituito un JSON valido');
+        var analysis = JSON.parse(jsonMatch[0]);
+
+        _currentDocAI = {
+            id: Date.now().toString(),
+            fileName: file.name,
+            fileSize: file.size,
+            uploadDate: new Date().toISOString(),
+            numPages: numPages,
+            textLength: fullText.length,
+            analysis: analysis,
+            rawTextPreview: fullText.substring(0, 500)
+        };
+
+        steps.innerHTML += '<br>✅ Analisi completata! Tipo: <strong>' + (analysis.tipoDocumentoLabel || analysis.tipoDocumento) + '</strong>';
+        steps.innerHTML += '<br>✅ Compagnia: <strong>' + (analysis.compagnia || 'N/D') + '</strong> | Confidenza: <strong>' + (analysis.confidenza || 'N/D') + '</strong>';
+        prog.style.width = '100%';
+
+        setTimeout(function() {
+            proc.style.display = 'none';
+            renderDocAIResult(analysis, file.name);
+            document.getElementById('docAIResultPanel').style.display = 'block';
+        }, 600);
+
+    } catch (err) {
+        status.textContent = 'Errore analisi';
+        steps.innerHTML += '<br>❌ ' + err.message;
+        prog.style.width = '100%';
+        prog.style.background = '#ef4444';
+        toast('Errore: ' + err.message, 'error');
+    }
+}
+
+function renderDocAIResult(a, fileName) {
+    var confColor = a.confidenza === 'alta' ? '#22c55e' : a.confidenza === 'media' ? '#f59e0b' : '#ef4444';
+
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+
+    // Left column
+    html += '<div>';
+
+    // Type badge + file
+    html += '<div style="background:rgba(0,196,180,.1);border:1px solid rgba(0,196,180,.3);border-radius:10px;padding:14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">';
+    html += '<div><span style="font-size:12px;text-transform:uppercase;font-weight:700;color:var(--fim-accent)">' + esc(a.tipoDocumentoLabel || a.tipoDocumento || 'Documento') + '</span>';
+    html += '<div style="font-size:11px;color:var(--fim-text-light);margin-top:2px">📎 ' + esc(fileName) + '</div></div>';
+    html += '<span style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:' + confColor + ';color:white">Confidenza: ' + (a.confidenza || 'N/D') + '</span></div>';
+
+    // Compagnia & Prodotto
+    html += '<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin-bottom:12px">';
+    html += '<h4 style="margin:0 0 10px;color:var(--fim-accent);font-size:13px">🏢 Compagnia & Prodotto</h4>';
+    html += '<div style="font-size:14px;font-weight:700">' + esc(a.compagnia || 'N/D') + '</div>';
+    if (a.prodotto) html += '<div style="font-size:12px;color:var(--fim-text-light)">' + esc(a.prodotto) + '</div>';
+    if (a.numPolizza) html += '<div style="font-size:12px;margin-top:4px">N. Polizza: <strong>' + esc(a.numPolizza) + '</strong></div>';
+    if (a.ramo) html += '<div style="font-size:12px;margin-top:2px">Ramo: <strong>' + esc(a.ramo) + '</strong></div>';
+    html += '</div>';
+
+    // Contraente
+    if (a.contraente && a.contraente.nome) {
+        html += '<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin-bottom:12px">';
+        html += '<h4 style="margin:0 0 10px;color:var(--fim-accent);font-size:13px">👤 Contraente</h4>';
+        html += '<div style="font-size:14px;font-weight:600">' + esc(a.contraente.nome) + '</div>';
+        if (a.contraente.cf) html += '<div style="font-size:12px">C.F.: ' + esc(a.contraente.cf) + '</div>';
+        if (a.contraente.piva) html += '<div style="font-size:12px">P.IVA: ' + esc(a.contraente.piva) + '</div>';
+        if (a.contraente.indirizzo) html += '<div style="font-size:12px">' + esc(a.contraente.indirizzo) + '</div>';
+        html += '</div>';
+    }
+
+    // Date & Premio
+    html += '<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin-bottom:12px">';
+    html += '<h4 style="margin:0 0 10px;color:var(--fim-accent);font-size:13px">📅 Periodo & Premio</h4>';
+    if (a.decorrenza) html += '<div style="font-size:12px">Decorrenza: <strong>' + formatDate(a.decorrenza) + '</strong></div>';
+    if (a.scadenza) html += '<div style="font-size:12px">Scadenza: <strong>' + formatDate(a.scadenza) + '</strong></div>';
+    if (a.durata) html += '<div style="font-size:12px">Durata: ' + esc(a.durata) + '</div>';
+    if (a.frazionamento) html += '<div style="font-size:12px">Frazionamento: ' + esc(a.frazionamento) + '</div>';
+    if (a.premio && a.premio.lordo) {
+        html += '<div style="margin-top:8px;padding:8px;background:rgba(0,196,180,.1);border-radius:6px">';
+        html += '<div style="font-size:18px;font-weight:800;color:var(--fim-accent)">' + formatCurrency(a.premio.lordo) + '</div>';
+        html += '<div style="font-size:11px;color:var(--fim-text-light)">Premio Lordo</div>';
+        if (a.premio.netto) html += '<div style="font-size:11px">Netto: ' + formatCurrency(a.premio.netto) + ' | Imposte: ' + formatCurrency(a.premio.imposte || 0) + ' | SSN: ' + formatCurrency(a.premio.ssn || 0) + '</div>';
+        html += '</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    // Right column
+    html += '<div>';
+
+    // Sintesi AI
+    if (a.sintesi) {
+        html += '<div style="background:rgba(102,126,234,.1);border:1px solid rgba(102,126,234,.3);border-radius:10px;padding:14px;margin-bottom:12px">';
+        html += '<h4 style="margin:0 0 8px;color:#667eea;font-size:13px">🧠 Sintesi AI</h4>';
+        html += '<div style="font-size:13px;line-height:1.5">' + esc(a.sintesi) + '</div>';
+        html += '</div>';
+    }
+
+    // Note importanti
+    if (a.note_importanti) {
+        html += '<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:14px;margin-bottom:12px">';
+        html += '<h4 style="margin:0 0 8px;color:#f59e0b;font-size:13px">⚠️ Note Importanti</h4>';
+        html += '<div style="font-size:12px;line-height:1.5">' + esc(a.note_importanti) + '</div>';
+        html += '</div>';
+    }
+
+    // Garanzie
+    if (a.garanzie && a.garanzie.length > 0 && a.garanzie[0] && a.garanzie[0].nome) {
+        html += '<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin-bottom:12px">';
+        html += '<h4 style="margin:0 0 10px;color:var(--fim-accent);font-size:13px">🛡️ Garanzie (' + a.garanzie.length + ')</h4>';
+        a.garanzie.forEach(function(g) {
+            html += '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px">';
+            html += '<div style="font-weight:600">' + esc(g.nome) + '</div>';
+            var details = [];
+            if (g.massimale) details.push('Massimale: ' + esc(g.massimale));
+            if (g.franchigia) details.push('Franchigia: ' + esc(g.franchigia));
+            if (g.scoperto) details.push('Scoperto: ' + esc(g.scoperto));
+            if (details.length > 0) html += '<div style="color:var(--fim-text-light)">' + details.join(' | ') + '</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+
+    // Esclusioni
+    if (a.esclusioni && a.esclusioni.length > 0) {
+        html += '<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:14px;margin-bottom:12px">';
+        html += '<h4 style="margin:0 0 10px;color:#ef4444;font-size:13px">🚫 Esclusioni (' + a.esclusioni.length + ')</h4>';
+        a.esclusioni.forEach(function(e) {
+            html += '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid rgba(239,68,68,.15)">• ' + esc(e) + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // Clausole speciali
+    if (a.clausole_speciali && a.clausole_speciali.length > 0) {
+        html += '<div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:10px;padding:14px;margin-bottom:12px">';
+        html += '<h4 style="margin:0 0 10px;color:#3b82f6;font-size:13px">📌 Clausole Speciali</h4>';
+        a.clausole_speciali.forEach(function(c) {
+            html += '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid rgba(59,130,246,.15)">• ' + esc(c) + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // Oggetto
+    if (a.oggetto) {
+        html += '<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin-bottom:12px">';
+        html += '<h4 style="margin:0 0 8px;color:var(--fim-accent);font-size:13px">📋 Oggetto Assicurato</h4>';
+        html += '<div style="font-size:13px">' + esc(a.oggetto) + '</div>';
+        if (a.targa) html += '<div style="font-size:12px;margin-top:4px">Targa: <strong>' + esc(a.targa) + '</strong></div>';
+        html += '</div>';
+    }
+
+    html += '</div></div>';
+
+    document.getElementById('docAIResultContent').innerHTML = html;
+}
+
+function saveDocAIResult() {
+    if (!_currentDocAI) { toast('Nessun risultato da salvare', 'error'); return; }
+    documentiAI.push(_currentDocAI);
+    localStorage.setItem('fim_documenti_ai', JSON.stringify(documentiAI));
+    renderDocumentiAIList();
+    toast('✅ Documento salvato nell\'archivio! (' + documentiAI.length + ' totali)', 'success');
+    _currentDocAI = null;
+}
+
+function resetDocAI() {
+    _currentDocAI = null;
+    document.getElementById('docAIProcessing').style.display = 'none';
+    document.getElementById('docAIResultPanel').style.display = 'none';
+    document.getElementById('docAIProgressFill').style.width = '0%';
+}
+
+function renderDocumentiAIList() {
+    var container = document.getElementById('docAIList');
+    if (!container) return;
+    if (!documentiAI || documentiAI.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:30px"><div style="font-size:40px;margin-bottom:10px">📂</div><div>Nessun documento analizzato</div><div style="font-size:12px">Carica un PDF per iniziare</div></div>';
+        return;
+    }
+
+    var search = (document.getElementById('docAISearch') ? document.getElementById('docAISearch').value : '').toLowerCase();
+    var filterType = document.getElementById('docAIFilterType') ? document.getElementById('docAIFilterType').value : 'all';
+
+    var filtered = documentiAI.filter(function(d) {
+        var a = d.analysis || {};
+        var matchSearch = !search ||
+            (d.fileName || '').toLowerCase().indexOf(search) !== -1 ||
+            (a.compagnia || '').toLowerCase().indexOf(search) !== -1 ||
+            (a.contraente && a.contraente.nome || '').toLowerCase().indexOf(search) !== -1 ||
+            (a.numPolizza || '').toLowerCase().indexOf(search) !== -1 ||
+            (a.sintesi || '').toLowerCase().indexOf(search) !== -1;
+        var matchType = filterType === 'all' || (a.tipoDocumento || '') === filterType;
+        return matchSearch && matchType;
+    });
+
+    filtered.sort(function(a, b) { return new Date(b.uploadDate) - new Date(a.uploadDate); });
+
+    var tipoIcons = { polizza: '📋', condizioni_contrattuali: '📜', pip: '📊', fascicolo_informativo: '📁', appendice: '📎', quietanza: '🧾', certificato: '✅' };
+
+    var html = '';
+    filtered.forEach(function(d) {
+        var a = d.analysis || {};
+        var icon = tipoIcons[a.tipoDocumento] || '📄';
+        var confColor = a.confidenza === 'alta' ? '#22c55e' : a.confidenza === 'media' ? '#f59e0b' : '#ef4444';
+
+        html += '<div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,.03);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:.2s;border:1px solid rgba(255,255,255,.05)" onclick="viewDocAIDetail(\'' + d.id + '\')" onmouseover="this.style.borderColor=\'var(--fim-accent)\'" onmouseout="this.style.borderColor=\'rgba(255,255,255,.05)\'">';
+        html += '<div style="font-size:28px">' + icon + '</div>';
+        html += '<div style="flex:1;min-width:0">';
+        html += '<div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(a.compagnia || 'N/D') + ' — ' + esc(a.tipoDocumentoLabel || a.tipoDocumento || 'Documento') + '</div>';
+        html += '<div style="font-size:12px;color:var(--fim-text-light)">';
+        if (a.contraente && a.contraente.nome) html += esc(a.contraente.nome) + ' | ';
+        if (a.numPolizza) html += 'N.' + esc(a.numPolizza) + ' | ';
+        html += esc(d.fileName);
+        html += '</div>';
+        if (a.sintesi) html += '<div style="font-size:11px;color:var(--fim-text-light);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(a.sintesi.substring(0, 100)) + '</div>';
+        html += '</div>';
+        html += '<div style="text-align:right;flex-shrink:0">';
+        if (a.premio && a.premio.lordo) html += '<div style="font-weight:700;color:var(--fim-accent);font-size:14px">' + formatCurrency(a.premio.lordo) + '</div>';
+        html += '<div style="font-size:11px;color:var(--fim-text-light)">' + formatDate(d.uploadDate ? d.uploadDate.split('T')[0] : '') + '</div>';
+        html += '<span style="font-size:10px;padding:2px 6px;border-radius:4px;color:white;background:' + confColor + '">' + (a.confidenza || '') + '</span>';
+        html += '</div>';
+        html += '<button onclick="event.stopPropagation();deleteDocAI(\'' + d.id + '\')" style="border:none;background:none;cursor:pointer;font-size:16px;color:#ef4444;padding:4px" title="Elimina">🗑️</button>';
+        html += '</div>';
+    });
+    html += '<div style="text-align:center;margin-top:12px;font-size:12px;color:var(--fim-text-light)">' + filtered.length + ' di ' + documentiAI.length + ' documenti</div>';
+
+    container.innerHTML = html;
+}
+
+function viewDocAIDetail(id) {
+    var doc = documentiAI.find(function(d) { return d.id === id; });
+    if (!doc) return;
+    _currentDocAI = doc;
+    renderDocAIResult(doc.analysis, doc.fileName);
+    document.getElementById('docAIResultPanel').style.display = 'block';
+    document.getElementById('docAIResultPanel').scrollIntoView({ behavior: 'smooth' });
+}
+
+function deleteDocAI(id) {
+    if (!confirm('Eliminare questo documento dall\'archivio?')) return;
+    documentiAI = documentiAI.filter(function(d) { return d.id !== id; });
+    localStorage.setItem('fim_documenti_ai', JSON.stringify(documentiAI));
+    renderDocumentiAIList();
+    toast('Documento eliminato', 'success');
 }
 </script>
 
