@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIM v1 → v2 Migrazione Dati</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--accent:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--txt:#e2e8f0;--muted:#94a3b8}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding:24px}
+h1{text-align:center;margin-bottom:8px;font-size:1.5rem}
+.sub{text-align:center;color:var(--muted);margin-bottom:24px;font-size:.9rem}
+.steps{max-width:900px;margin:0 auto}
+.step{background:var(--card);border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid rgba(255,255,255,.08)}
+.step h2{font-size:1.1rem;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.step h2 .num{background:var(--accent);color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}
+.step h2 .done{background:var(--ok)}
+textarea{width:100%;height:120px;background:var(--bg);border:1px solid rgba(255,255,255,.15);color:var(--txt);border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;resize:vertical}
+button{padding:10px 20px;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.9rem;margin-top:8px;margin-right:8px;transition:.2s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-success{background:var(--ok);color:#fff}
+.btn-success:hover{background:#16a34a}
+.btn-warn{background:var(--warn);color:#000}
+.info{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:12px;margin:12px 0;font-size:.85rem;line-height:1.5}
+.warn{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3)}
+pre.code{background:#0a0f1a;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;overflow-x:auto;font-size:.75rem;line-height:1.4;margin:8px 0;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto;cursor:pointer}
+pre.code:hover{border-color:var(--accent)}
+#log{background:#0a0f1a;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;max-height:400px;overflow-y:auto;font-family:monospace;font-size:.78rem;line-height:1.5}
+.log-ok{color:var(--ok)}.log-err{color:var(--err)}.log-warn{color:var(--warn)}.log-info{color:var(--accent)}
+table.summary{width:100%;border-collapse:collapse;margin:12px 0;font-size:.85rem}
+table.summary th,table.summary td{padding:6px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08)}
+table.summary th{color:var(--muted);font-weight:500}
+table.summary td.n{text-align:right;font-weight:600}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600}
+.badge-ok{background:rgba(34,197,94,.2);color:var(--ok)}
+.badge-err{background:rgba(239,68,68,.2);color:var(--err)}
+.badge-wait{background:rgba(148,163,184,.2);color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+input[type=text],input[type=password]{width:100%;padding:8px 12px;background:var(--bg);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:var(--txt);font-size:.85rem;margin:4px 0}
+label{font-size:.85rem;color:var(--muted);display:block;margin-top:8px}
+</style>
+</head>
+<body>
+
+<h1>🔄 FIM Gestionale — Migrazione v1 → v2</h1>
+<p class="sub">Trasferimento dati da localStorage (v1) a Supabase (v2)</p>
+
+<div class="steps">
+
+<!-- STEP 1: Export -->
+<div class="step" id="step1">
+<h2><span class="num" id="num1">1</span> Esporta dati dal Gestionale v1</h2>
+<div class="info">
+Apri il file <strong>FIM_Insurance_Database.html</strong> nel browser, poi premi <strong>F12</strong> → <strong>Console</strong> e incolla lo script qui sotto. Copia il risultato JSON nel campo sottostante.
+</div>
+<p style="font-size:.85rem;margin:8px 0">Script da copiare in console (clicca per copiare):</p>
+<pre class="code" id="exportScript" onclick="copyScript()">(function(){
+  var keys=['fim_clienti','fim_polizze_db','fim_collaboratori','fim_compagnie',
+    'fim_sinistri','fim_fatture','fim_preventivi','fim_quotazioni',
+    'fim_quietanze','fim_settings','fim_prov_table','fim_indiv_prov',
+    'fim_prov_overrides','fim_polizze_saldate','fim_wa_templates'];
+  var data={_exportDate:new Date().toISOString(),_version:'v1'};
+  keys.forEach(function(k){
+    try{var v=localStorage.getItem(k);if(v){data[k]=JSON.parse(v)}}
+    catch(e){try{data[k]=v}catch(e2){}}
+  });
+  var j=JSON.stringify(data);
+  console.log('FIM Export: '+Object.keys(data).length+' chiavi, '+j.length+' chars');
+  // Copia negli appunti
+  if(navigator.clipboard){navigator.clipboard.writeText(j).then(function(){
+    console.log('✅ Copiato negli appunti! Incolla nel tool di migrazione.')
+  })}
+  // Anche download come file
+  var b=new Blob([j],{type:'application/json'});var u=URL.createObjectURL(b);
+  var a=document.createElement('a');a.href=u;a.download='fim_v1_export_'+
+    new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(u);
+  console.log('📥 File scaricato: '+a.download);
+  return 'Export completato: '+Object.keys(data).length+' chiavi';
+})()</pre>
+<label>Incolla qui il JSON esportato (o carica il file .json):</label>
+<div style="display:flex;gap:8px;align-items:start;margin-top:4px">
+<textarea id="jsonInput" placeholder='{"_exportDate":"...","fim_clienti":[...],...}'></textarea>
+</div>
+<div style="margin-top:8px">
+<input type="file" id="fileInput" accept=".json" onchange="loadFile(event)" style="font-size:.85rem">
+<button class="btn-primary" onclick="parseExport()">📋 Analizza Dati</button>
+</div>
+<div id="parseResult"></div>
+</div>
+
+<!-- STEP 2: Config Supabase -->
+<div class="step" id="step2">
+<h2><span class="num" id="num2">2</span> Configurazione Supabase</h2>
+<div class="grid2">
+<div>
+<label>Supabase URL</label>
+<input type="text" id="sbUrl" value="https://cdhhfyhzwhdjoafitiwf.supabase.co">
+</div>
+<div>
+<label>Service Role Key (secret)</label>
+<input type="password" id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIs...">
+</div>
+</div>
+<div class="info warn" style="margin-top:12px">⚠️ Usa la <strong>Service Role Key</strong> (NON la anon key) per bypassare le RLS e inserire i dati. La trovi in Supabase → Settings → API.</div>
+<button class="btn-primary" onclick="testConnection()">🔌 Testa Connessione</button>
+<span id="connStatus"></span>
+</div>
+
+<!-- STEP 3: Preview mapping -->
+<div class="step" id="step3">
+<h2><span class="num" id="num3">3</span> Anteprima Trasformazione</h2>
+<p style="font-size:.85rem;color:var(--muted)">Mappatura automatica dei campi v1 → v2 con preview dei dati trasformati.</p>
+<div id="previewArea"></div>
+</div>
+
+<!-- STEP 4: Import -->
+<div class="step" id="step4">
+<h2><span class="num" id="num4">4</span> Importa in Supabase</h2>
+<p style="font-size:.85rem;color:var(--muted)">Ordine: collaboratori → clienti → polizze → sinistri. Ogni record mantiene il mapping v1_id.</p>
+<button class="btn-success" onclick="startImport()" id="btnImport" disabled>🚀 Avvia Importazione</button>
+<button class="btn-warn" onclick="clearLog()">🗑️ Pulisci Log</button>
+<div id="log" style="margin-top:12px"></div>
+</div>
+
+</div>
+
+<script>
+// ===== STATE =====
+let v1Data = null;
+let transformed = { collaboratori: [], clienti: [], polizze: [], sinistri: [] };
+let idMaps = { collaboratori: {}, clienti: {}, compagnie: {}, rami: {} };
+const SB = () => ({ url: document.getElementById('sbUrl').value.replace(/\/$/,''), key: document.getElementById('sbKey').value });
+
+// ===== STEP 1: Parse =====
+function copyScript() {
+  const t = document.getElementById('exportScript').textContent;
+  navigator.clipboard.writeText(t).then(() => alert('Script copiato! Incollalo nella console del v1.'));
+}
+function loadFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { document.getElementById('jsonInput').value = ev.target.result; parseExport(); };
+  r.readAsText(f);
+}
+function parseExport() {
+  const raw = document.getElementById('jsonInput').value.trim();
+  if (!raw) return alert('Incolla il JSON o carica un file');
+  try { v1Data = JSON.parse(raw); } catch(e) { return alert('JSON non valido: ' + e.message); }
+
+  const counts = {};
+  const keys = ['fim_clienti','fim_polizze_db','fim_collaboratori','fim_compagnie','fim_sinistri','fim_fatture','fim_quietanze','fim_settings'];
+  keys.forEach(k => { counts[k] = Array.isArray(v1Data[k]) ? v1Data[k].length : (v1Data[k] ? 1 : 0); });
+
+  let html = '<table class="summary"><tr><th>Tabella v1</th><th>Record</th><th>Stato</th></tr>';
+  const labels = {'fim_clienti':'Clienti','fim_polizze_db':'Polizze','fim_collaboratori':'Collaboratori','fim_compagnie':'Compagnie','fim_sinistri':'Sinistri','fim_fatture':'Fatture','fim_quietanze':'Quietanze','fim_settings':'Settings'};
+  keys.forEach(k => {
+    const n = counts[k];
+    const badge = n > 0 ? `<span class="badge badge-ok">${n}</span>` : '<span class="badge badge-wait">vuoto</span>';
+    html += `<tr><td>${labels[k]||k}</td><td class="n">${n}</td><td>${badge}</td></tr>`;
+  });
+  html += '</table>';
+  if (v1Data._exportDate) html += `<p style="font-size:.8rem;color:var(--muted)">Export del ${new Date(v1Data._exportDate).toLocaleString('it-IT')}</p>`;
+
+  document.getElementById('parseResult').innerHTML = html;
+  document.getElementById('num1').classList.add('done');
+
+  // Auto-trigger preview
+  buildPreview();
+}
+
+// ===== STEP 2: Connection test =====
+async function testConnection() {
+  const {url, key} = SB();
+  if (!url || !key) return alert('Inserisci URL e Service Role Key');
+  document.getElementById('connStatus').innerHTML = ' ⏳ Testing...';
+  try {
+    // Test fetching compagnie count
+    const r = await fetch(`${url}/rest/v1/compagnie?select=id&limit=1`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+    document.getElementById('connStatus').innerHTML = ' <span class="badge badge-ok">✅ Connesso</span>';
+    document.getElementById('num2').classList.add('done');
+  } catch(e) {
+    document.getElementById('connStatus').innerHTML = ` <span class="badge badge-err">❌ ${e.message}</span>`;
+  }
+}
+
+// ===== STEP 3: Transform & Preview =====
+async function buildPreview() {
+  if (!v1Data) return;
+  const area = document.getElementById('previewArea');
+  area.innerHTML = '<p style="color:var(--muted)">⏳ Preparando anteprima...</p>';
+
+  // First load existing compagnie and rami from Supabase for ID mapping
+  const {url, key} = SB();
+  if (url && key) {
+    try {
+      const [compR, ramiR, collabR] = await Promise.all([
+        fetch(`${url}/rest/v1/compagnie?select=id,codice,nome,nome_normalizzato&limit=200`, { headers: {'apikey':key,'Authorization':`Bearer ${key}`} }),
+        fetch(`${url}/rest/v1/rami_assicurativi?select=id,codice,nome&limit=100`, { headers: {'apikey':key,'Authorization':`Bearer ${key}`} }),
+        fetch(`${url}/rest/v1/collaboratori?select=id,codice,cognome,nome&limit=100`, { headers: {'apikey':key,'Authorization':`Bearer ${key}`} })
+      ]);
+      const compagnie = await compR.json();
+      const rami = await ramiR.json();
+      const collabs = await collabR.json();
+
+      // Build lookup maps
+      if (Array.isArray(compagnie)) compagnie.forEach(c => {
+        idMaps.compagnie[c.nome.toLowerCase()] = c.id;
+        idMaps.compagnie[c.nome_normalizzato.toLowerCase()] = c.id;
+        idMaps.compagnie[c.codice.toLowerCase()] = c.id;
+      });
+      if (Array.isArray(rami)) rami.forEach(r => {
+        idMaps.rami[r.nome.toLowerCase()] = r.id;
+        idMaps.rami[r.codice.toLowerCase()] = r.id;
+      });
+      if (Array.isArray(collabs)) collabs.forEach(c => {
+        idMaps.collaboratori[c.codice] = c.id;
+      });
+    } catch(e) { console.warn('Could not preload Supabase lookups:', e); }
+  }
+
+  // Transform collaboratori
+  transformed.collaboratori = transformCollaboratori(v1Data.fim_collaboratori || []);
+  transformed.clienti = transformClienti(v1Data.fim_clienti || []);
+  transformed.polizze = transformPolizze(v1Data.fim_polizze_db || []);
+  transformed.sinistri = transformSinistri(v1Data.fim_sinistri || []);
+
+  let html = '<table class="summary"><tr><th>Tabella v2</th><th>Record da importare</th><th>Note</th></tr>';
+  html += `<tr><td>collaboratori</td><td class="n">${transformed.collaboratori.length}</td><td>Nuovi (non ancora in Supabase)</td></tr>`;
+  html += `<tr><td>clienti</td><td class="n">${transformed.clienti.length}</td><td>Mapping tipo: PF→privato, PG→azienda</td></tr>`;
+  html += `<tr><td>polizze</td><td class="n">${transformed.polizze.length}</td><td>Con dettagli_ramo JSON per targa, veicolo etc.</td></tr>`;
+  html += `<tr><td>sinistri</td><td class="n">${transformed.sinistri.length}</td><td>Riferimenti a polizze e clienti</td></tr>`;
+  html += '</table>';
+
+  // Show sample transformed records
+  if (transformed.clienti.length > 0) {
+    html += '<p style="margin-top:12px;font-size:.85rem;font-weight:600">Esempio cliente trasformato:</p>';
+    html += `<pre class="code">${JSON.stringify(transformed.clienti[0], null, 2)}</pre>`;
+  }
+  if (transformed.polizze.length > 0) {
+    html += '<p style="margin-top:12px;font-size:.85rem;font-weight:600">Esempio polizza trasformata:</p>';
+    html += `<pre class="code">${JSON.stringify(transformed.polizze[0], null, 2)}</pre>`;
+  }
+
+  area.innerHTML = html;
+  document.getElementById('num3').classList.add('done');
+  document.getElementById('btnImport').disabled = false;
+}
+
+// ===== TRANSFORM FUNCTIONS =====
+
+function transformCollaboratori(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(c => c && c.nome).map(c => ({
+    _v1id: c.id,
+    codice: c.codice || `V1-${(c.cognome||'X').substring(0,3).toUpperCase()}${String(Math.random()).slice(2,5)}`,
+    cognome: c.cognome || c.nome.split(' ').pop() || '',
+    nome: c.nome.split(' ').slice(0,-1).join(' ') || c.nome || '',
+    codice_rui: c.rui || null,
+    ruolo: mapRuolo(c.ruolo),
+    email: c.email || null,
+    telefono: c.telefono || null,
+    indirizzo: c.indirizzo || null,
+    citta: c.citta || null,
+    provincia: null,
+    data_nomina: parseDate(c.dataInizio) || parseDate(c.dataMandato) || null,
+    data_cessazione: null,
+    attivo: (c.statoCollab || '').toLowerCase() !== 'inattivo',
+    perc_provv_default: parseFloat(c.retrocessione) || 7.00,
+    note: c.note || null,
+    uuid_firebase: c.id || null
+  }));
+}
+
+function transformClienti(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(c => c && (c.cognome || c.nome)).map(c => {
+    const isPG = (c.tipo === 'PG' || c.tipo === 'azienda');
+    return {
+      _v1id: c.id,
+      tipo: isPG ? 'azienda' : 'privato',
+      cognome: isPG ? null : (c.cognome || null),
+      nome: isPG ? null : (c.nome || null),
+      codice_fiscale: (!isPG && c.codiceFiscale && c.codiceFiscale.length === 16) ? c.codiceFiscale.toUpperCase() : null,
+      data_nascita: parseDate(c.dataNascita) || null,
+      luogo_nascita: c.luogoNascita || null,
+      sesso: (c.sesso === 'M' || c.sesso === 'F') ? c.sesso : null,
+      ragione_sociale: isPG ? (c.cognome ? `${c.cognome} ${c.nome||''}`.trim() : c.nome) : null,
+      partita_iva: (c.partitaIva && c.partitaIva.length === 11) ? c.partitaIva : null,
+      pec: c.pec || null,
+      telefono: c.telefono || null,
+      cellulare: c.whatsapp || null,
+      email: c.email || null,
+      indirizzo: c.indirizzoResidenza || c.indirizzoDomicilio || null,
+      cap: c.capResidenza || null,
+      citta: c.comuneResidenza || null,
+      provincia: c.provinciaResidenza || null,
+      consenso_marketing: c.consensoPrivacy || false,
+      data_consenso: parseTimestamp(c.dataConsenso) || null,
+      note: c.note || null,
+      uuid_firebase: c.id || null
+    };
+  });
+}
+
+function transformPolizze(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(p => p && p.numPolizza).map(p => {
+    const ramoMatch = matchRamo(p.tipoGaranzia || p.ramo || '');
+    const compMatch = matchCompagnia(p.compagnia || '');
+
+    // Build dettagli_ramo JSON
+    const dettagli = {};
+    if (p.targa) dettagli.targa = p.targa;
+    if (p.marca) dettagli.marca = p.marca;
+    if (p.modello) dettagli.modello = p.modello;
+    if (p.annoImmatricolazione) dettagli.anno_immatricolazione = p.annoImmatricolazione;
+    if (p.alimentazione) dettagli.alimentazione = p.alimentazione;
+    if (p.classeCU) dettagli.classe_cu = p.classeCU;
+    if (p.rateScadenze) dettagli.rate_scadenze = p.rateScadenze;
+
+    return {
+      _v1id: p.id,
+      _v1clienteId: p.clienteId,
+      _v1collaboratore: p.collaboratore,
+      _v1compagnia: p.compagnia,
+      _v1ramo: p.tipoGaranzia || p.ramo || '',
+      numero_polizza: p.numPolizza,
+      cliente_id: null, // resolved during import
+      compagnia_id: compMatch,
+      ramo_id: ramoMatch,
+      collaboratore_id: null, // resolved during import
+      data_emissione: parseDate(p.decorrenza) || parseDate(p.createdAt) || new Date().toISOString().slice(0,10),
+      data_effetto: parseDate(p.decorrenza) || new Date().toISOString().slice(0,10),
+      data_scadenza: parseDate(p.scadenza) || new Date().toISOString().slice(0,10),
+      data_disdetta: p.annullata ? (parseDate(p.dataAnnullamento) || null) : null,
+      stato: p.annullata ? 'annullata' : (new Date(p.scadenza) < new Date() ? 'scaduta' : 'attiva'),
+      frazionamento: mapFrazionamento(p.frazionamento),
+      tacito_rinnovo: true,
+      premio_lordo: parseFloat(p.premio) || 0,
+      imposte: parseFloat(p.importoTasse) || (parseFloat(p.premio) * (parseFloat(p.percImposte)||13.5) / 100) || 0,
+      ssn: parseFloat(p.importoSSN) || (parseFloat(p.premio) * (parseFloat(p.percSSN)||0) / 100) || 0,
+      imponibile: parseFloat(p.importoImponibile) || null,
+      dettagli_ramo: Object.keys(dettagli).length > 0 ? dettagli : {},
+      note: [p.note, p.motivoAnnullamento].filter(Boolean).join(' | ') || null,
+      uuid_firebase: p.id || null
+    };
+  });
+}
+
+function transformSinistri(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(s => s && s.numero).map(s => ({
+    _v1id: s.id,
+    _v1polizzaId: s.polizzaId,
+    numero_sinistro: s.numero,
+    data_evento: parseDate(s.data) || new Date().toISOString().slice(0,10),
+    data_apertura: parseDate(s.createdAt) || parseDate(s.data) || new Date().toISOString().slice(0,10),
+    data_chiusura: s.stato === 'chiuso' ? (parseDate(s.dataChiusura) || null) : null,
+    descrizione: s.descrizione || s.tipo || 'Sinistro importato da v1',
+    tipo_sinistro: s.tipo || null,
+    stato: mapStatoSinistro(s.stato),
+    importo_liquidato: parseFloat(s.importoLiquidato) || null,
+    riserva: parseFloat(s.importoRichiesto) || null,
+    note: `[Importato da v1] ${s.descrizione || ''}`.trim(),
+    uuid_firebase: s.id || null
+  }));
+}
+
+// ===== HELPERS =====
+
+function mapRuolo(r) {
+  if (!r) return 'subagente';
+  const l = r.toLowerCase();
+  if (l.includes('titolare')) return 'titolare';
+  if (l.includes('agente') && !l.includes('sub')) return 'subagente';
+  if (l.includes('collabor')) return 'collaboratore';
+  if (l.includes('segnal')) return 'segnalatore';
+  return 'subagente';
+}
+
+function mapFrazionamento(f) {
+  if (!f) return 'annuale';
+  const l = f.toLowerCase();
+  if (l.includes('semestr')) return 'semestrale';
+  if (l.includes('trimestr')) return 'trimestrale';
+  if (l.includes('mens')) return 'mensile';
+  if (l.includes('unica') || l.includes('soluz')) return 'unica';
+  return 'annuale';
+}
+
+function mapStatoSinistro(s) {
+  if (!s) return 'aperto';
+  const l = s.toLowerCase();
+  if (l.includes('chiuso')) return 'chiuso';
+  if (l.includes('gestione') || l.includes('istrut')) return 'in_istruttoria';
+  if (l.includes('liquid')) return 'liquidato';
+  if (l.includes('respin')) return 'respinto';
+  return 'aperto';
+}
+
+function matchCompagnia(name) {
+  if (!name) return null;
+  const n = name.toLowerCase().trim();
+  // Try exact match first
+  if (idMaps.compagnie[n]) return idMaps.compagnie[n];
+  // Try partial match
+  for (const [k, v] of Object.entries(idMaps.compagnie)) {
+    if (n.includes(k) || k.includes(n)) return v;
+  }
+  return null;
+}
+
+function matchRamo(tipo) {
+  if (!tipo) return null;
+  const t = tipo.toLowerCase().trim();
+  // Direct lookup
+  if (idMaps.rami[t]) return idMaps.rami[t];
+  // Pattern matching
+  const patterns = {
+    'rca': ['rca','r.c. auto','rc auto','responsabilità civile auto'],
+    'furto_incendio': ['furto','incendio','f/i','furto/incendio','furto_incendio'],
+    'kasko': ['kasko','casco'],
+    'vita': ['vita','tcm','temporanea'],
+    'infortuni': ['infortuni','infortunio'],
+    'rc_generale': ['rc generale','rc gener','responsabilità civile'],
+    'rc_professionale': ['rc prof','rc_prof','professionale','profess'],
+    'multirischio': ['multirischio','multir','multi rischio'],
+    'multirischio_casa': ['casa','abitazione','multi casa'],
+    'assistenza': ['assistenza','assist'],
+    'tutela_legale': ['tutela','legale'],
+    'trasporti': ['trasport'],
+  };
+  for (const [code, pats] of Object.entries(patterns)) {
+    if (pats.some(p => t.includes(p))) {
+      if (idMaps.rami[code]) return idMaps.rami[code];
+      // Try with nome
+      for (const [k, v] of Object.entries(idMaps.rami)) {
+        if (pats.some(p => k.includes(p))) return v;
+      }
+    }
+  }
+  return null;
+}
+
+function parseDate(d) {
+  if (!d) return null;
+  try {
+    // Handle ISO timestamps
+    if (d.includes('T')) d = d.split('T')[0];
+    // Handle dd/mm/yyyy
+    if (d.includes('/')) {
+      const parts = d.split('/');
+      if (parts.length === 3) {
+        if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+        if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`;
+      }
+    }
+    // Already yyyy-mm-dd
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    // Try native parse
+    const dt = new Date(d);
+    if (!isNaN(dt)) return dt.toISOString().slice(0,10);
+  } catch(e) {}
+  return null;
+}
+
+function parseTimestamp(d) {
+  if (!d) return null;
+  try {
+    const dt = new Date(d);
+    if (!isNaN(dt)) return dt.toISOString();
+  } catch(e) {}
+  return null;
+}
+
+// ===== STEP 4: Import =====
+
+function log(msg, cls='') {
+  const el = document.getElementById('log');
+  el.innerHTML += `<div class="${cls}">[${new Date().toLocaleTimeString('it-IT')}] ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+function clearLog() { document.getElementById('log').innerHTML = ''; }
+
+async function sbPost(table, data) {
+  const {url, key} = SB();
+  const r = await fetch(`${url}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) {
+    const err = await r.text();
+    throw new Error(`${r.status} ${table}: ${err}`);
+  }
+  return r.json();
+}
+
+async function sbUpsert(table, data, onConflict) {
+  const {url, key} = SB();
+  const r = await fetch(`${url}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation,resolution=merge-duplicates'
+    },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) {
+    const err = await r.text();
+    throw new Error(`${r.status} ${table}: ${err}`);
+  }
+  return r.json();
+}
+
+async function sbSelect(table, query='') {
+  const {url, key} = SB();
+  const r = await fetch(`${url}/rest/v1/${table}?${query}`, {
+    headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+  });
+  return r.json();
+}
+
+async function startImport() {
+  const {url, key} = SB();
+  if (!url || !key) return alert('Configura Supabase (Step 2)');
+  if (!v1Data) return alert('Carica i dati v1 (Step 1)');
+
+  document.getElementById('btnImport').disabled = true;
+  clearLog();
+  log('🚀 Inizio importazione FIM v1 → v2', 'log-info');
+
+  try {
+    // ===== 1. COLLABORATORI =====
+    log('━━━ COLLABORATORI ━━━', 'log-info');
+    const existingCollabs = await sbSelect('collaboratori', 'select=id,codice,uuid_firebase');
+    const existingCollabUuids = new Set((existingCollabs||[]).map(c => c.uuid_firebase).filter(Boolean));
+    const existingCollabCodes = new Set((existingCollabs||[]).map(c => c.codice));
+
+    // Map existing collabs
+    (existingCollabs||[]).forEach(c => {
+      if (c.uuid_firebase) idMaps.collaboratori[c.uuid_firebase] = c.id;
+      idMaps.collaboratori[c.codice] = c.id;
+    });
+
+    const newCollabs = transformed.collaboratori.filter(c =>
+      !existingCollabUuids.has(c._v1id) && !existingCollabCodes.has(c.codice)
+    );
+
+    if (newCollabs.length > 0) {
+      for (const c of newCollabs) {
+        try {
+          const clean = {...c}; delete clean._v1id;
+          const [inserted] = await sbPost('collaboratori', clean);
+          idMaps.collaboratori[c._v1id] = inserted.id;
+          idMaps.collaboratori[c.codice] = inserted.id;
+          log(`  ✅ ${clean.nome} ${clean.cognome} (${clean.codice}) → id:${inserted.id}`, 'log-ok');
+        } catch(e) {
+          log(`  ❌ ${c.codice}: ${e.message}`, 'log-err');
+        }
+      }
+    } else {
+      log('  ℹ️ Nessun nuovo collaboratore da importare', 'log-info');
+    }
+    log(`  Totale collaboratori mappati: ${Object.keys(idMaps.collaboratori).length}`, 'log-info');
+
+    // ===== 2. CLIENTI =====
+    log('━━━ CLIENTI ━━━', 'log-info');
+    const existingClienti = await sbSelect('clienti', 'select=id,uuid_firebase,codice_fiscale,partita_iva&limit=5000');
+    const existingClientUuids = new Set((existingClienti||[]).map(c => c.uuid_firebase).filter(Boolean));
+    const existingCFs = new Set((existingClienti||[]).map(c => c.codice_fiscale).filter(Boolean));
+    const existingPIVAs = new Set((existingClienti||[]).map(c => c.partita_iva).filter(Boolean));
+
+    // Map existing
+    (existingClienti||[]).forEach(c => {
+      if (c.uuid_firebase) idMaps.clienti[c.uuid_firebase] = c.id;
+    });
+
+    let clientiImported = 0, clientiSkipped = 0, clientiErrors = 0;
+    const BATCH = 20;
+
+    for (let i = 0; i < transformed.clienti.length; i += BATCH) {
+      const batch = transformed.clienti.slice(i, i + BATCH);
+      for (const c of batch) {
+        // Skip if already exists
+        if (existingClientUuids.has(c._v1id)) {
+          idMaps.clienti[c._v1id] = (existingClienti.find(x => x.uuid_firebase === c._v1id)||{}).id;
+          clientiSkipped++;
+          continue;
+        }
+        // Skip if CF or PIVA already exists (avoid unique constraint)
+        if (c.codice_fiscale && existingCFs.has(c.codice_fiscale)) {
+          const existing = existingClienti.find(x => x.codice_fiscale === c.codice_fiscale);
+          if (existing) idMaps.clienti[c._v1id] = existing.id;
+          clientiSkipped++;
+          continue;
+        }
+        if (c.partita_iva && existingPIVAs.has(c.partita_iva)) {
+          const existing = existingClienti.find(x => x.partita_iva === c.partita_iva);
+          if (existing) idMaps.clienti[c._v1id] = existing.id;
+          clientiSkipped++;
+          continue;
+        }
+
+        try {
+          const clean = {...c}; delete clean._v1id;
+          const [inserted] = await sbPost('clienti', clean);
+          idMaps.clienti[c._v1id] = inserted.id;
+          existingCFs.add(c.codice_fiscale);
+          existingPIVAs.add(c.partita_iva);
+          clientiImported++;
+        } catch(e) {
+          log(`  ❌ Cliente ${c.cognome||c.ragione_sociale}: ${e.message}`, 'log-err');
+          clientiErrors++;
+        }
+      }
+      if (i + BATCH < transformed.clienti.length) {
+        log(`  ... ${Math.min(i+BATCH, transformed.clienti.length)}/${transformed.clienti.length} processati`, 'log-info');
+      }
+    }
+    log(`  ✅ Clienti: ${clientiImported} importati, ${clientiSkipped} già presenti, ${clientiErrors} errori`, 'log-ok');
+
+    // ===== 3. POLIZZE =====
+    log('━━━ POLIZZE ━━━', 'log-info');
+    const existingPolizze = await sbSelect('polizze', 'select=id,uuid_firebase,numero_polizza&limit=10000');
+    const existingPolUuids = new Set((existingPolizze||[]).map(p => p.uuid_firebase).filter(Boolean));
+
+    let polImported = 0, polSkipped = 0, polErrors = 0;
+
+    // We need a default ramo_id for unmatched rami
+    let defaultRamoId = idMaps.rami['altro'] || null;
+    if (!defaultRamoId) {
+      const ramiAll = await sbSelect('rami_assicurativi', 'select=id,codice');
+      const altroRamo = (ramiAll||[]).find(r => r.codice.toLowerCase() === 'altro' || r.codice.toLowerCase() === 'altr');
+      if (altroRamo) defaultRamoId = altroRamo.id;
+      else if (ramiAll && ramiAll.length > 0) defaultRamoId = ramiAll[0].id;
+    }
+
+    // Also need a default compagnia
+    let defaultCompagniaId = null;
+    const compAll = await sbSelect('compagnie', 'select=id,codice&limit=1');
+    if (compAll && compAll.length > 0) defaultCompagniaId = compAll[0].id;
+
+    for (let i = 0; i < transformed.polizze.length; i++) {
+      const p = transformed.polizze[i];
+
+      if (existingPolUuids.has(p._v1id)) { polSkipped++; continue; }
+
+      // Resolve foreign keys
+      const clienteId = idMaps.clienti[p._v1clienteId] || null;
+      const collaboratoreId = idMaps.collaboratori[p._v1collaboratore] || null;
+      const compagniaId = p.compagnia_id || matchCompagnia(p._v1compagnia) || defaultCompagniaId;
+      const ramoId = p.ramo_id || matchRamo(p._v1ramo) || defaultRamoId;
+
+      if (!clienteId) {
+        // Try to find client by name from polizza data
+        log(`  ⚠️ Polizza ${p.numero_polizza}: cliente non trovato (v1_id: ${p._v1clienteId})`, 'log-warn');
+        polErrors++;
+        continue;
+      }
+      if (!compagniaId) {
+        log(`  ⚠️ Polizza ${p.numero_polizza}: compagnia '${p._v1compagnia}' non trovata`, 'log-warn');
+        polErrors++;
+        continue;
+      }
+      if (!ramoId) {
+        log(`  ⚠️ Polizza ${p.numero_polizza}: ramo '${p._v1ramo}' non trovato`, 'log-warn');
+        polErrors++;
+        continue;
+      }
+
+      try {
+        const clean = {
+          uuid_firebase: p.uuid_firebase,
+          numero_polizza: p.numero_polizza,
+          cliente_id: clienteId,
+          compagnia_id: compagniaId,
+          ramo_id: ramoId,
+          collaboratore_id: collaboratoreId,
+          data_emissione: p.data_emissione,
+          data_effetto: p.data_effetto,
+          data_scadenza: p.data_scadenza,
+          data_disdetta: p.data_disdetta,
+          stato: p.stato,
+          frazionamento: p.frazionamento,
+          tacito_rinnovo: p.tacito_rinnovo,
+          premio_lordo: p.premio_lordo,
+          imposte: p.imposte,
+          ssn: p.ssn,
+          imponibile: p.imponibile,
+          dettagli_ramo: p.dettagli_ramo,
+          note: p.note
+        };
+        const [inserted] = await sbPost('polizze', clean);
+        polImported++;
+        if (polImported % 25 === 0) log(`  ... ${polImported} polizze importate`, 'log-info');
+      } catch(e) {
+        // Handle duplicate numero_polizza
+        if (e.message.includes('23505')) {
+          polSkipped++;
+        } else {
+          log(`  ❌ Polizza ${p.numero_polizza}: ${e.message}`, 'log-err');
+          polErrors++;
+        }
+      }
+    }
+    log(`  ✅ Polizze: ${polImported} importate, ${polSkipped} già presenti, ${polErrors} errori`, 'log-ok');
+
+    // ===== 4. SINISTRI =====
+    if (transformed.sinistri.length > 0) {
+      log('━━━ SINISTRI ━━━', 'log-info');
+      // Need polizza ID mapping - rebuild from imported polizze
+      const allPolizze = await sbSelect('polizze', 'select=id,uuid_firebase&limit=10000');
+      const polMap = {};
+      (allPolizze||[]).forEach(p => { if (p.uuid_firebase) polMap[p.uuid_firebase] = p.id; });
+
+      let sinImported = 0, sinErrors = 0;
+      for (const s of transformed.sinistri) {
+        const polizzaId = polMap[s._v1polizzaId];
+        if (!polizzaId) {
+          log(`  ⚠️ Sinistro ${s.numero_sinistro}: polizza v1_id ${s._v1polizzaId} non trovata`, 'log-warn');
+          sinErrors++;
+          continue;
+        }
+        // Get cliente_id and compagnia_id from polizza
+        const [pol] = await sbSelect('polizze', `select=cliente_id,compagnia_id&id=eq.${polizzaId}`);
+        if (!pol) { sinErrors++; continue; }
+
+        try {
+          const clean = {
+            numero_sinistro: s.numero_sinistro,
+            polizza_id: polizzaId,
+            cliente_id: pol.cliente_id,
+            compagnia_id: pol.compagnia_id,
+            data_evento: s.data_evento,
+            data_apertura: s.data_apertura,
+            data_chiusura: s.data_chiusura,
+            descrizione: s.descrizione,
+            tipo_sinistro: s.tipo_sinistro,
+            stato: s.stato,
+            importo_liquidato: s.importo_liquidato,
+            riserva: s.riserva,
+            note: s.note
+          };
+          await sbPost('sinistri', clean);
+          sinImported++;
+        } catch(e) {
+          log(`  ❌ Sinistro ${s.numero_sinistro}: ${e.message}`, 'log-err');
+          sinErrors++;
+        }
+      }
+      log(`  ✅ Sinistri: ${sinImported} importati, ${sinErrors} errori`, 'log-ok');
+    }
+
+    // ===== SUMMARY =====
+    log('', '');
+    log('════════════════════════════════════════', 'log-info');
+    log('🎉 MIGRAZIONE COMPLETATA!', 'log-ok');
+    log('════════════════════════════════════════', 'log-info');
+
+    // Verify counts
+    const [cCount] = await sbSelect('clienti', 'select=count');
+    const [pCount] = await sbSelect('polizze', 'select=count');
+    log(`📊 Totale in Supabase: clienti=${JSON.stringify(cCount)}, polizze=${JSON.stringify(pCount)}`, 'log-info');
+
+    document.getElementById('num4').classList.add('done');
+
+  } catch(e) {
+    log(`❌ ERRORE CRITICO: ${e.message}`, 'log-err');
+    console.error(e);
+  }
+
+  document.getElementById('btnImport').disabled = false;
+}
+</script>
+</body>
+</html>
