@@ -810,6 +810,9 @@
             </a>
 
             <div class="nav-section">Strumenti</div>
+            <a onclick="navigateTo('agentepdf')" data-page="agentepdf">
+                <span class="nav-icon">&#x1F916;</span> Agente AI PDF
+            </a>
             <a onclick="navigateTo('documenti')" data-page="documenti">
                 <span class="nav-icon">&#x1F4C4;</span> FIMA Documenti
             </a>
@@ -1209,6 +1212,140 @@
                     <div class="card" style="cursor:pointer" onclick="generateReport('sinistri')">
                         <h3 style="font-size:16px;margin-bottom:8px">&#x26A0; Report Sinistri</h3>
                         <p style="font-size:13px;color:var(--fim-text-light)">Sinistri aperti e loss ratio per ramo</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======== AGENTE AI PDF ======== -->
+            <div id="page-agentepdf" class="page">
+                <h1 class="page-title">Agente AI — Processing PDF Polizze</h1>
+                <p class="page-subtitle">Carica un PDF di polizza per estrazione automatica, validazione e archiviazione in Supabase</p>
+
+                <div style="display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start">
+                    <!-- Main area -->
+                    <div>
+                        <!-- Upload zone -->
+                        <div class="card" id="pdfDropZone" ondrop="handlePDFDrop(event)" ondragover="event.preventDefault();this.style.borderColor='var(--fim-accent)'" ondragleave="this.style.borderColor=''" onclick="document.getElementById('pdfFileInput').click()" style="border:2px dashed rgba(0,196,180,.3);text-align:center;padding:40px;cursor:pointer;transition:.2s">
+                            <div style="font-size:48px;margin-bottom:12px">📄</div>
+                            <p style="font-size:15px;font-weight:600">Trascina qui il PDF della polizza</p>
+                            <p style="font-size:12px;color:var(--fim-text-light);margin-top:4px">oppure clicca per selezionare il file</p>
+                            <input type="file" id="pdfFileInput" accept=".pdf" style="display:none" onchange="handlePDFSelect(event)">
+                        </div>
+
+                        <!-- Processing progress -->
+                        <div id="pdfProgressArea" class="card" style="display:none">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                                <strong id="pdfProcessingStatus" style="font-size:14px">Elaborazione in corso...</strong>
+                                <span id="pdfProcessingStep" style="font-size:12px;color:var(--fim-text-light)"></span>
+                            </div>
+                            <div style="background:rgba(255,255,255,.08);border-radius:6px;height:8px;overflow:hidden">
+                                <div id="pdfProgressFill" style="width:0%;height:100%;background:var(--fim-accent);border-radius:6px;transition:width .4s ease"></div>
+                            </div>
+                            <div id="pdfProcessingSteps" style="font-size:11px;color:var(--fim-text-light);margin-top:8px"></div>
+                        </div>
+
+                        <!-- Extraction results -->
+                        <div id="pdfResultsArea" style="display:none">
+                            <!-- Cliente -->
+                            <div class="card">
+                                <h3 style="font-size:14px;margin-bottom:12px;color:var(--fim-accent)">👤 Dati Cliente Estratti</h3>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                                    <div class="form-group"><label>Nominativo <span id="conf_nom" class="badge badge-success" style="font-size:10px"></span></label><input class="form-control" id="pdf_nominativo"></div>
+                                    <div class="form-group"><label>Codice Fiscale <span id="conf_cf" class="badge" style="font-size:10px"></span></label><input class="form-control" id="pdf_cf" maxlength="16"></div>
+                                    <div class="form-group"><label>P.IVA</label><input class="form-control" id="pdf_piva" maxlength="11"></div>
+                                    <div class="form-group"><label>Telefono</label><input class="form-control" id="pdf_telefono"></div>
+                                    <div class="form-group"><label>Email</label><input class="form-control" id="pdf_email"></div>
+                                    <div class="form-group"><label>Indirizzo</label><input class="form-control" id="pdf_indirizzo"></div>
+                                </div>
+                                <div id="pdfMatchResult" style="margin-top:8px;padding:8px;border-radius:6px;font-size:12px;display:none"></div>
+                            </div>
+
+                            <!-- Polizza -->
+                            <div class="card">
+                                <h3 style="font-size:14px;margin-bottom:12px;color:var(--fim-accent)">📋 Dati Polizza Estratti</h3>
+                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                                    <div class="form-group"><label>Compagnia <span id="conf_comp" class="badge" style="font-size:10px"></span></label><input class="form-control" id="pdf_compagnia"></div>
+                                    <div class="form-group"><label>N. Polizza <span id="conf_pol" class="badge" style="font-size:10px"></span></label><input class="form-control" id="pdf_numPolizza"></div>
+                                    <div class="form-group"><label>Targa</label><input class="form-control" id="pdf_targa" style="text-transform:uppercase"></div>
+                                    <div class="form-group"><label>Veicolo</label><input class="form-control" id="pdf_veicolo"></div>
+                                    <div class="form-group"><label>Ramo</label>
+                                        <select class="form-control" id="pdf_ramo">
+                                            <option value="">— Seleziona —</option>
+                                            <option>RC Auto</option><option>RCA + Furto/Incendio</option><option>Kasko</option>
+                                            <option>Vita</option><option>Infortuni</option><option>RC Professionale</option>
+                                            <option>Multirischio Casa</option><option>Multirischio Azienda</option>
+                                            <option>Tutela Legale</option><option>Trasporti</option><option>Altro</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label>Frazionamento</label>
+                                        <select class="form-control" id="pdf_frazionamento">
+                                            <option>Annuale</option><option>Semestrale</option><option>Trimestrale</option><option>Mensile</option><option>Unica</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label>Decorrenza</label><input class="form-control" type="date" id="pdf_decorrenza"></div>
+                                    <div class="form-group"><label>Scadenza</label><input class="form-control" type="date" id="pdf_scadenza"></div>
+                                    <div class="form-group"><label>Collaboratore</label>
+                                        <select class="form-control" id="pdf_collaboratore"><option value="">— Nessuno —</option></select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Importi -->
+                            <div class="card">
+                                <h3 style="font-size:14px;margin-bottom:12px;color:var(--fim-accent)">💰 Importi</h3>
+                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+                                    <div class="form-group"><label>Imponibile €</label><input class="form-control" type="number" step="0.01" id="pdf_imponibile" onchange="recalcPDFTotals()"></div>
+                                    <div class="form-group"><label>Imposte €</label><input class="form-control" type="number" step="0.01" id="pdf_tasse" onchange="recalcPDFTotals()"></div>
+                                    <div class="form-group"><label>SSN €</label><input class="form-control" type="number" step="0.01" id="pdf_ssn" onchange="recalcPDFTotals()"></div>
+                                    <div class="form-group"><label>Premio Lordo € <span id="pdfMathCheck" style="font-size:10px"></span></label><input class="form-control" type="number" step="0.01" id="pdf_premioLordo" style="font-weight:700"></div>
+                                </div>
+                                <div id="pdfGaranzieArea" style="margin-top:8px;display:none">
+                                    <label style="font-size:12px;color:var(--fim-text-light)">Garanzie rilevate:</label>
+                                    <div id="pdfGaranzieList" style="font-size:12px;margin-top:4px"></div>
+                                </div>
+                            </div>
+
+                            <!-- File naming -->
+                            <div class="card">
+                                <h3 style="font-size:14px;margin-bottom:8px">📁 Rinomina Automatica</h3>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+                                    <div><span style="color:var(--fim-text-light)">Originale:</span> <span id="pdfOriginalName" style="font-family:monospace"></span></div>
+                                    <div><span style="color:var(--fim-accent)">Proposto:</span> <strong id="pdfNewName" style="font-family:monospace"></strong></div>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div style="display:flex;gap:8px;margin-top:12px">
+                                <button class="btn btn-primary" onclick="savePDFExtraction()" id="btnSavePDF">💾 Salva in Supabase</button>
+                                <button class="btn btn-secondary" onclick="undoLastPDFSave()" id="btnUndoPDF" style="display:none">↩️ Annulla ultimo</button>
+                                <button class="btn btn-secondary" onclick="resetPDFAgent()">🗑️ Nuova estrazione</button>
+                            </div>
+                        </div>
+
+                        <!-- Raw text debug -->
+                        <details id="pdfDebugArea" style="display:none;margin-top:12px">
+                            <summary style="font-size:12px;color:var(--fim-text-light);cursor:pointer">🔍 Testo grezzo estratto (debug)</summary>
+                            <pre id="pdfRawText" style="background:#0a0f1a;color:var(--fim-text-light);padding:12px;border-radius:8px;font-size:11px;max-height:300px;overflow:auto;margin-top:8px;white-space:pre-wrap"></pre>
+                        </details>
+                    </div>
+
+                    <!-- Sidebar stats -->
+                    <div>
+                        <div class="card">
+                            <h3 style="font-size:14px;margin-bottom:12px">📊 Statistiche Agente</h3>
+                            <div style="display:grid;gap:8px;font-size:13px">
+                                <div style="display:flex;justify-content:space-between"><span>Processati:</span><strong id="agStatTotal">0</strong></div>
+                                <div style="display:flex;justify-content:space-between"><span style="color:#22c55e">Validati OK:</span><strong id="agStatOK" style="color:#22c55e">0</strong></div>
+                                <div style="display:flex;justify-content:space-between"><span style="color:#f59e0b">Con warning:</span><strong id="agStatWarn" style="color:#f59e0b">0</strong></div>
+                                <div style="display:flex;justify-content:space-between"><span style="color:#ef4444">Rigettati:</span><strong id="agStatFail" style="color:#ef4444">0</strong></div>
+                                <hr style="border-color:rgba(255,255,255,.08)">
+                                <div style="display:flex;justify-content:space-between"><span>Accuratezza media:</span><strong id="agStatAccuracy">—</strong></div>
+                            </div>
+                        </div>
+                        <div class="card" style="margin-top:12px">
+                            <h3 style="font-size:14px;margin-bottom:8px">📜 Log Elaborazioni</h3>
+                            <div id="agentPDFLog" style="font-size:11px;max-height:400px;overflow-y:auto;font-family:monospace;line-height:1.6"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2882,6 +3019,861 @@ th{background:#1a3a5c;color:#fff}
 </style></head><body>${content}</body></html>`);
     w.document.close();
     w.print();
+}
+
+// ══════════════════════════════════════════════════════════════
+// ████  AGENTE AI — PROCESSING PDF POLIZZE  ████
+// ══════════════════════════════════════════════════════════════
+
+var currentPDFData = null;
+var lastSavedPDFId = null;
+var agentPDFStats = JSON.parse(localStorage.getItem('fim_agent_pdf_stats') || '{"total":0,"ok":0,"warn":0,"fail":0,"accuracySum":0}');
+
+// Load pdf.js dynamically
+(function loadPdfJs() {
+    if (window.pdfjsLib) return;
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = function() { console.log('[AgentePDF] pdf.js loaded'); };
+    document.head.appendChild(s);
+})();
+
+// Init stats on load
+document.addEventListener('DOMContentLoaded', function() {
+    updateAgentStats();
+    // Populate collaboratori dropdown in PDF form
+    setTimeout(function() {
+        var sel = document.getElementById('pdf_collaboratore');
+        if (sel && cache.collaboratori) {
+            sel.innerHTML = '<option value="">— Nessuno —</option>' +
+                cache.collaboratori.map(function(c) {
+                    return '<option value="' + c.id + '">' + (c.cognome || '') + ' ' + (c.nome || '') + '</option>';
+                }).join('');
+        }
+    }, 3000);
+});
+
+function handlePDFDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    document.getElementById('pdfDropZone').style.borderColor = '';
+    var files = event.dataTransfer.files;
+    if (files.length > 0 && files[0].type === 'application/pdf') {
+        processPDFFile(files[0]);
+    } else {
+        toast('Seleziona un file PDF valido', 'error');
+    }
+}
+
+function handlePDFSelect(event) {
+    if (event.target.files.length > 0) processPDFFile(event.target.files[0]);
+}
+
+async function processPDFFile(file) {
+    currentPDFData = { originalName: file.name };
+    document.getElementById('pdfOriginalName').textContent = file.name;
+    document.getElementById('pdfProgressArea').style.display = 'block';
+    document.getElementById('pdfResultsArea').style.display = 'none';
+    document.getElementById('btnUndoPDF').style.display = 'none';
+    document.getElementById('btnSavePDF').style.display = 'inline-flex';
+    document.getElementById('pdfDebugArea').style.display = 'none';
+
+    var prog = document.getElementById('pdfProgressFill');
+    var status = document.getElementById('pdfProcessingStatus');
+    var stepInfo = document.getElementById('pdfProcessingStep');
+    var steps = document.getElementById('pdfProcessingSteps');
+    prog.style.width = '0%';
+    steps.innerHTML = '';
+
+    try {
+        // Step 1: Load PDF
+        status.textContent = 'Caricamento PDF...';
+        stepInfo.textContent = 'Step 1/4';
+        steps.innerHTML = '✅ File ricevuto: ' + file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
+        prog.style.width = '10%';
+
+        var arrayBuffer = await file.arrayBuffer();
+        if (!window.pdfjsLib) {
+            // Try to load pdf.js if not loaded yet
+            await new Promise(function(resolve, reject) {
+                var s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                s.onload = resolve;
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+        }
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        var numPages = pdf.numPages;
+        steps.innerHTML += '<br>✅ PDF caricato: ' + numPages + ' pagine';
+        prog.style.width = '20%';
+
+        // Step 2: Extract text (positional method)
+        status.textContent = 'Estrazione testo posizionale...';
+        stepInfo.textContent = 'Step 2/4';
+        var fullText = '';
+        for (var i = 1; i <= Math.min(numPages, 12); i++) {
+            var page = await pdf.getPage(i);
+            var tc = await page.getTextContent();
+            var items = tc.items.filter(function(item) { return item.str && item.str.trim(); });
+            if (items.length === 0) continue;
+            var rows = [];
+            items.forEach(function(item) {
+                var y = Math.round((item.transform ? item.transform[5] : 0) * 10) / 10;
+                var x = item.transform ? item.transform[4] : 0;
+                var found = false;
+                for (var r = 0; r < rows.length; r++) {
+                    if (Math.abs(rows[r].y - y) < 3) { rows[r].items.push({ x: x, str: item.str }); found = true; break; }
+                }
+                if (!found) rows.push({ y: y, items: [{ x: x, str: item.str }] });
+            });
+            rows.sort(function(a, b) { return b.y - a.y; });
+            rows.forEach(function(row) {
+                row.items.sort(function(a, b) { return a.x - b.x; });
+                var lineText = '';
+                for (var j = 0; j < row.items.length; j++) {
+                    if (j > 0) {
+                        var gap = row.items[j].x - (row.items[j - 1].x + (row.items[j - 1].str.length * 4));
+                        lineText += gap > 30 ? '\t' : ' ';
+                    }
+                    lineText += row.items[j].str;
+                }
+                fullText += lineText + '\n';
+            });
+            fullText += '\n--- PAGE BREAK ---\n';
+        }
+        steps.innerHTML += '<br>✅ Testo estratto: ' + fullText.length + ' caratteri';
+        prog.style.width = '45%';
+        currentPDFData.rawText = fullText;
+
+        // Show debug
+        document.getElementById('pdfDebugArea').style.display = 'block';
+        var rawEl = document.getElementById('pdfRawText');
+        rawEl.textContent = fullText.length > 5000 ? fullText.substring(0, 5000) + '\n... [troncato a 5000 caratteri]' : fullText;
+
+        // Step 3: AI or Regex extraction
+        var extracted;
+        var apiUrl = localStorage.getItem('fim_ai_proxy') || 'https://fim-gestionale-v2.vercel.app/api/claude';
+
+        // Try AI extraction via FIMA proxy
+        status.textContent = 'Analisi AI con FIMA...';
+        stepInfo.textContent = 'Step 3/4';
+        steps.innerHTML += '<br>🤖 Invio a FIMA per analisi intelligente...';
+        prog.style.width = '50%';
+
+        var textForAI = fullText.length > 15000 ? fullText.substring(0, 15000) + '\n\n[...TESTO TRONCATO...]' : fullText;
+
+        var aiPrompt = 'Sei un esperto analista assicurativo italiano. Analizza questa polizza assicurativa e restituisci un JSON strutturato.\n\n' +
+            'DOCUMENTO:\n```\n' + textForAI + '\n```\n\n' +
+            'Rispondi SOLO con un oggetto JSON valido (senza markdown, senza ```), con questa struttura:\n' +
+            '{\n' +
+            '  "compagnia": "nome compagnia assicurativa",\n' +
+            '  "numPolizza": "numero polizza",\n' +
+            '  "cliente": "nome completo contraente (COGNOME NOME o Ragione Sociale)",\n' +
+            '  "cf": "codice fiscale del contraente se presente",\n' +
+            '  "piva": "partita IVA se presente",\n' +
+            '  "indirizzo": "indirizzo del contraente se presente",\n' +
+            '  "telefono": "telefono se presente",\n' +
+            '  "email": "email se presente",\n' +
+            '  "targa": "targa veicolo se polizza auto",\n' +
+            '  "veicolo": "marca e modello veicolo se presente",\n' +
+            '  "decorrenza": "YYYY-MM-DD",\n' +
+            '  "scadenza": "YYYY-MM-DD",\n' +
+            '  "frazionamento": "Annuale|Semestrale|Trimestrale|Mensile",\n' +
+            '  "tipoGaranzia": "RC Auto|RCA + Furto/Incendio|Kasko|Vita|Infortuni|RC Professionale|Multirischio Casa|Multirischio Azienda|Tutela Legale|Trasporti|Altro",\n' +
+            '  "premioNetto": 0,\n' +
+            '  "importoImposte": 0,\n' +
+            '  "importoSSN": 0,\n' +
+            '  "premioLordo": 0,\n' +
+            '  "garanzie": ["lista garanzie incluse"],\n' +
+            '  "confidenza": "alta|media|bassa"\n' +
+            '}\n\n' +
+            'REGOLE:\n' +
+            '- Date in formato YYYY-MM-DD\n' +
+            '- Importi come numeri decimali senza simbolo euro\n' +
+            '- premioNetto = imponibile (senza tasse e SSN)\n' +
+            '- premioLordo = totale pagato dal cliente\n' +
+            '- Se un campo non e presente, usa null\n' +
+            '- Rispondi SOLO con il JSON';
+
+        try {
+            var aiResp = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'claude-sonnet-4-20250514',
+                    max_tokens: 2048,
+                    messages: [{ role: 'user', content: aiPrompt }]
+                })
+            });
+
+            if (!aiResp.ok) throw new Error('API ' + aiResp.status);
+
+            var aiData = await aiResp.json();
+            var aiText = aiData.content && aiData.content[0] ? aiData.content[0].text : '';
+            prog.style.width = '70%';
+
+            var aiJSON;
+            try {
+                var jsonMatch = aiText.match(/\{[\s\S]*\}/);
+                aiJSON = JSON.parse(jsonMatch ? jsonMatch[0] : aiText);
+            } catch (pe) {
+                steps.innerHTML += '<br>⚠️ Errore parsing AI, fallback a regex...';
+                aiJSON = null;
+            }
+
+            if (aiJSON) {
+                extracted = {
+                    cliente: aiJSON.cliente || '',
+                    cf: aiJSON.cf || '',
+                    compagnia: aiJSON.compagnia || '',
+                    numPolizza: aiJSON.numPolizza || '',
+                    targa: aiJSON.targa || '',
+                    veicolo: aiJSON.veicolo || '',
+                    decorrenza: aiJSON.decorrenza || '',
+                    scadenza: aiJSON.scadenza || '',
+                    frazionamento: aiJSON.frazionamento || '',
+                    tipoGaranzia: aiJSON.tipoGaranzia || '',
+                    _premioNetto: aiJSON.premioNetto || '',
+                    _importoImposte: aiJSON.importoImposte || '',
+                    _importoSSN: aiJSON.importoSSN || '',
+                    premio: aiJSON.premioLordo || '',
+                    telefono: aiJSON.telefono || '',
+                    email: aiJSON.email || '',
+                    indirizzo: aiJSON.indirizzo || '',
+                    _detectedFormat: 'CLAUDE AI (' + (aiJSON.confidenza || 'media') + ')',
+                    _garanzie: aiJSON.garanzie || [],
+                    _piva: aiJSON.piva || ''
+                };
+                steps.innerHTML += '<br>✅ Analisi AI completata (confidenza: ' + (aiJSON.confidenza || 'media') + ')';
+            } else {
+                extracted = extractPolicyDataV2(fullText);
+                steps.innerHTML += '<br>⚠️ Fallback a estrazione regex';
+            }
+        } catch (aiErr) {
+            steps.innerHTML += '<br>⚠️ AI non disponibile (' + aiErr.message + '), uso regex...';
+            extracted = extractPolicyDataV2(fullText);
+        }
+
+        currentPDFData.extracted = extracted;
+        var foundCount = Object.keys(extracted).filter(function(k) { return !k.startsWith('_') && extracted[k]; }).length;
+        steps.innerHTML += '<br>✅ Campi estratti: ' + foundCount + ' (formato: ' + (extracted._detectedFormat || 'GENERIC') + ')';
+        prog.style.width = '85%';
+
+        // Step 4: DB Matching
+        status.textContent = 'Matching database...';
+        stepInfo.textContent = 'Step 4/4';
+        var match = agentMatchClienteDBv2(extracted);
+        currentPDFData.match = match;
+        steps.innerHTML += '<br>✅ Matching: ' + match.message;
+        prog.style.width = '100%';
+
+        // Show results
+        setTimeout(function() {
+            document.getElementById('pdfProgressArea').style.display = 'none';
+            populateExtractionFormV2(extracted, match);
+            document.getElementById('pdfResultsArea').style.display = 'block';
+
+            // Update stats
+            agentPDFStats.total++;
+            var isAI = (extracted._detectedFormat || '').indexOf('CLAUDE AI') >= 0;
+            if (extracted.compagnia && extracted.numPolizza && extracted.cliente) {
+                agentPDFStats.ok++;
+                agentPDFStats.accuracySum += isAI ? 95 : 70;
+            } else if (extracted.compagnia || extracted.numPolizza) {
+                agentPDFStats.warn++;
+                agentPDFStats.accuracySum += isAI ? 60 : 40;
+            } else {
+                agentPDFStats.fail++;
+                agentPDFStats.accuracySum += 10;
+            }
+            localStorage.setItem('fim_agent_pdf_stats', JSON.stringify(agentPDFStats));
+            updateAgentStats();
+            addAgentLog(file.name, extracted, match);
+        }, 500);
+
+    } catch (err) {
+        status.textContent = 'Errore durante l\'elaborazione';
+        steps.innerHTML += '<br>❌ Errore: ' + err.message;
+        prog.style.width = '100%';
+        prog.style.background = '#ef4444';
+        toast('Errore elaborazione PDF: ' + err.message, 'error');
+        agentPDFStats.total++;
+        agentPDFStats.fail++;
+        localStorage.setItem('fim_agent_pdf_stats', JSON.stringify(agentPDFStats));
+        updateAgentStats();
+    }
+}
+
+// ─── REGEX EXTRACTION (fallback when AI unavailable) ───
+function extractPolicyDataV2(text) {
+    var data = {};
+    var m;
+
+    // Detect format
+    if (/WAKAM/i.test(text)) data._detectedFormat = 'WAKAM';
+    else if (/Great\s*Lakes|Prima\s*Assicurazioni|prima\.it/i.test(text)) data._detectedFormat = 'PRIMA';
+    else if (/HDI\s*Assicurazioni/i.test(text)) data._detectedFormat = 'HDI';
+    else if (/UnipolSai/i.test(text)) data._detectedFormat = 'UNIPOLSAI';
+    else if (/Allianz/i.test(text)) data._detectedFormat = 'ALLIANZ';
+    else if (/Generali/i.test(text)) data._detectedFormat = 'GENERALI';
+    else if (/Bene\s*Assicurazioni/i.test(text)) data._detectedFormat = 'BENE';
+    else data._detectedFormat = 'GENERIC';
+
+    // 1. NUMERO POLIZZA
+    m = text.match(/POLIZZA\s+AUTO\s+(\d{3}[A-Z]{3}\d{8,12})/i);
+    if (m) data.numPolizza = m[1];
+    if (!data.numPolizza) { m = text.match(/POLIZZA\s+AUTO\s+(BLP\d{6,12})/i); if (m) data.numPolizza = m[1]; }
+    if (!data.numPolizza) { m = text.match(/[Pp]olizza\s*(?:n\.?|numero|num\.?)\s*[:\s]*([A-Z0-9/\-]{5,20})/i); if (m) data.numPolizza = m[1].trim(); }
+    if (!data.numPolizza) { m = text.match(/[Pp]olizza[^0-9]{0,30}(\d{7,15})/); if (m) data.numPolizza = m[1]; }
+
+    // 2. COMPAGNIA
+    var companyPatterns = [
+        { p: /HDI\s*Assicurazioni/i, n: 'HDI Assicurazioni' },
+        { p: /Generali\s*Italia/i, n: 'Generali Italia' },
+        { p: /UnipolSai/i, n: 'UnipolSai' },
+        { p: /Allianz\s*Direct/i, n: 'Allianz Direct' },
+        { p: /Allianz\s*S\.?p\.?A/i, n: 'Allianz' },
+        { p: /Allianz/i, n: 'Allianz' },
+        { p: /AXA/i, n: 'AXA' },
+        { p: /Zurich/i, n: 'Zurich' },
+        { p: /Vittoria\s*Assicurazioni/i, n: 'Vittoria Assicurazioni' },
+        { p: /Sara\s*Assicurazioni/i, n: 'Sara Assicurazioni' },
+        { p: /Reale\s*Mutua/i, n: 'Reale Mutua' },
+        { p: /Bene\s*Assicurazioni/i, n: 'Bene Assicurazioni' },
+        { p: /Groupama/i, n: 'Groupama' },
+        { p: /Helvetia/i, n: 'Helvetia' },
+        { p: /Net\s*Insurance/i, n: 'Net Insurance' },
+        { p: /WAKAM/i, n: 'WAKAM' },
+        { p: /Great\s*Lakes\s*Insurance/i, n: 'Great Lakes Insurance SE' },
+        { p: /Prima\s*Assicurazioni/i, n: 'Prima Assicurazioni' },
+        { p: /ConTe\.it/i, n: 'ConTe.it' },
+        { p: /MetLife/i, n: 'MetLife' },
+        { p: /ARAG/i, n: 'ARAG' },
+        { p: /Europ\s*Assistance/i, n: 'Europ Assistance' },
+        { p: /Genertel/i, n: 'Genertel' },
+        { p: /Dallbogg/i, n: 'Dallbogg' },
+        { p: /Chubb/i, n: 'Chubb' },
+        { p: /\bGenerali\b/i, n: 'Generali' }
+    ];
+    for (var ci = 0; ci < companyPatterns.length; ci++) {
+        if (companyPatterns[ci].p.test(text)) { data.compagnia = companyPatterns[ci].n; break; }
+    }
+
+    // 3. TARGA
+    m = text.match(/[Tt]arga\s*(?:veicolo)?[:\s]+([A-Z]{2}\s*\d{3}\s*[A-Z]{2})/i);
+    if (m) data.targa = m[1].replace(/\s/g, '').toUpperCase();
+    if (!data.targa) { m = text.match(/\bTARGA\b[\s\n]+([A-Z]{2}\d{3}[A-Z]{2})/i); if (m) data.targa = m[1].toUpperCase(); }
+    if (!data.targa) { m = text.match(/\b([A-Z]{2}\d{3}[A-Z]{2})\b/); if (m) data.targa = m[1]; }
+
+    // 4. CLIENTE
+    function cleanNameV2(raw) {
+        if (!raw) return '';
+        return raw.trim()
+            .replace(/\s*[-–]\s*(?:VIA|V\.|PIAZZA|VIALE|CORSO|LARGO).*$/i, '')
+            .replace(/\s*(?:VIA|V\.|PIAZZA|VIALE|CORSO)\s+[A-ZÀ-Ú].*$/i, '')
+            .replace(/\s*Codice.*$/i, '')
+            .replace(/\s*C\.?F\.?[\s:]+.*$/i, '')
+            .replace(/\s*P\.?\s*I\.?V\.?A\.?[\s:]+.*$/i, '')
+            .replace(/\s*\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b.*$/i, '')
+            .replace(/\s*\b\d{11}\b.*$/i, '')
+            .replace(/\s*\b\d{5}\b.*$/i, '')
+            .replace(/\s*Nato\s+a.*$/i, '')
+            .replace(/\s*Data\s+di\s+nascita.*$/i, '')
+            .trim();
+    }
+
+    m = text.match(/(?:Assicurato|Intestatario|Contraente)[\s:]+([A-ZÀ-Úa-zà-ú][A-ZÀ-Úa-zà-ú\s.,']{3,60}?)(?:\s*[-–]\s*(?:VIA|PIAZZA|VIALE|CORSO)|\s*\n|\s*Codice|\s*C\.?F\.?|\s*\d{5})/i);
+    if (m) data.cliente = cleanNameV2(m[1]);
+    if (!data.cliente) {
+        m = text.match(/[Cc]ontraente[\s:\t]+(?:Cognome[^A-Z]*)?([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú\s.,']{3,50})/);
+        if (m) data.cliente = cleanNameV2(m[1]);
+    }
+    if (!data.cliente) {
+        m = text.match(/\bNome\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)+)/);
+        if (m) data.cliente = cleanNameV2(m[1]);
+    }
+
+    // 5. CODICE FISCALE
+    m = text.match(/(?:Codice\s*Fiscale|C\.?F\.?)[\s/:]*([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])/i);
+    if (m) data.cf = m[1].toUpperCase();
+    if (!data.cf) { m = text.match(/\b([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])\b/); if (m) data.cf = m[1]; }
+    if (!data.cf) { m = text.match(/(?:P\.?\s*I\.?V\.?A\.?|Partita\s*IVA)[\s/:]*(\d{11})/i); if (m) { data.cf = m[1]; data._piva = m[1]; } }
+
+    // 6. DATE
+    function parseItDate(d, mo, y) { return y + '-' + mo.toString().padStart(2, '0') + '-' + d.toString().padStart(2, '0'); }
+    function extractDateV2(text, keyword) {
+        var re = new RegExp(keyword + '[:\\s\\t]*(?:ore\\s*\\d{1,2}[:\\s]*\\d{0,2}\\s*del\\s*)?(\\d{1,2})[/\\-\\s](\\d{1,2})[/\\-\\s](\\d{4})', 'i');
+        var mt = text.match(re);
+        if (mt) return parseItDate(mt[1], mt[2], mt[3]);
+        return null;
+    }
+
+    data.decorrenza = extractDateV2(text, 'Inizio\\s+contratto') || extractDateV2(text, 'Decorrenza') || extractDateV2(text, 'dalle\\s+ore');
+    data.scadenza = extractDateV2(text, 'Fine\\s+contratto') || extractDateV2(text, 'Scadenza');
+
+    // 7. IMPORTI
+    function extractAmount(text, keyword) {
+        var re = new RegExp(keyword + '[:\\s€]*([\\d.,]+)', 'i');
+        var mt = text.match(re);
+        if (mt) {
+            var val = mt[1].replace(/\./g, '').replace(',', '.');
+            var num = parseFloat(val);
+            return isNaN(num) ? '' : num;
+        }
+        return '';
+    }
+
+    data._premioNetto = extractAmount(text, 'Premio\\s*(?:netto|imponibile)') || extractAmount(text, 'Imponibile');
+    data._importoImposte = extractAmount(text, 'Imposte') || extractAmount(text, 'Tasse');
+    data._importoSSN = extractAmount(text, 'SSN') || extractAmount(text, 'Contributo\\s*SSN');
+    data.premio = extractAmount(text, 'Premio\\s*(?:lordo|totale|complessivo|annuo\\s*lordo)') || extractAmount(text, 'Totale\\s*(?:di\\s*polizza|premio|annuo|dovuto)');
+
+    // 8. FRAZIONAMENTO
+    if (/semestral/i.test(text)) data.frazionamento = 'Semestrale';
+    else if (/trimestral/i.test(text)) data.frazionamento = 'Trimestrale';
+    else if (/mensil/i.test(text)) data.frazionamento = 'Mensile';
+    else if (/unica/i.test(text)) data.frazionamento = 'Unica';
+    else data.frazionamento = 'Annuale';
+
+    // 9. TIPO GARANZIA
+    if (data.targa) data.tipoGaranzia = 'RC Auto';
+    else if (/RC\s*Professionale|responsabilit.\s*civile\s*professionale/i.test(text)) data.tipoGaranzia = 'RC Professionale';
+    else if (/multirischio\s*(?:abitazione|casa|fabbricato)/i.test(text)) data.tipoGaranzia = 'Multirischio Casa';
+    else if (/multirischio\s*(?:aziend|commerc|industri)/i.test(text)) data.tipoGaranzia = 'Multirischio Azienda';
+    else if (/infortuni/i.test(text)) data.tipoGaranzia = 'Infortuni';
+    else if (/\bvita\b/i.test(text) && !/\bvia\b/i.test(text)) data.tipoGaranzia = 'Vita';
+    else if (/tutela\s*legale/i.test(text)) data.tipoGaranzia = 'Tutela Legale';
+    else if (/trasport/i.test(text)) data.tipoGaranzia = 'Trasporti';
+    else data.tipoGaranzia = 'Altro';
+
+    data._garanzie = [];
+    data._piva = data._piva || '';
+    data.telefono = '';
+    data.email = '';
+    data.indirizzo = '';
+    data.veicolo = '';
+
+    // Try to extract vehicle
+    m = text.match(/(?:Marca|Modello|Veicolo)[\s:]+([A-ZÀ-Úa-zà-ú\s\d]{3,40})/i);
+    if (m) data.veicolo = m[1].trim();
+
+    // Email
+    m = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    if (m) data.email = m[0];
+
+    // Phone
+    m = text.match(/(?:Tel|Telefono|Cell)[:\s]*([+\d\s/\-]{8,18})/i);
+    if (m) data.telefono = m[1].trim();
+
+    // Address
+    m = text.match(/(?:Indirizzo|Residenza|Via|Piazza)\s*[:\s]*([A-ZÀ-Úa-zà-ú\s.,\d]{5,80})/i);
+    if (m) data.indirizzo = m[1].trim();
+
+    return data;
+}
+
+// ─── DB MATCHING (against Supabase cache) ───
+function agentMatchClienteDBv2(data) {
+    var cf = (data.cf || '').toUpperCase().trim();
+    var numPol = (data.numPolizza || '').trim();
+    var nome = (data.cliente || '').toLowerCase().trim();
+
+    // L1: Match by CF
+    if (cf && cf.length >= 11) {
+        var foundC = cache.clienti.find(function(c) {
+            return (c.codice_fiscale || '').toUpperCase() === cf || (c.partita_iva || '') === cf;
+        });
+        if (foundC) {
+            var cName = foundC.ragione_sociale || ((foundC.cognome || '') + ' ' + (foundC.nome || '')).trim();
+            return { level: 'L1', confidence: 100, cliente: cName, clienteId: foundC.id, message: 'Match L1 (CF): ' + cName, isNew: false };
+        }
+    }
+
+    // L3: Match by policy number
+    if (numPol) {
+        var foundP = cache.polizze.find(function(p) {
+            return (p.numero_polizza || '').toLowerCase() === numPol.toLowerCase();
+        });
+        if (foundP) {
+            var cliP = cache.clienti.find(function(c) { return c.id === foundP.cliente_id; });
+            var nameP = cliP ? (cliP.ragione_sociale || ((cliP.cognome || '') + ' ' + (cliP.nome || '')).trim()) : 'Cliente #' + foundP.cliente_id;
+            return { level: 'L3', confidence: 95, cliente: nameP, clienteId: foundP.cliente_id, message: 'Match L3 (Polizza): ' + nameP, isNew: false };
+        }
+    }
+
+    // L4: Fuzzy name match
+    if (nome && nome.length > 2) {
+        var candidates = [];
+        cache.clienti.forEach(function(c) {
+            var cName = (c.ragione_sociale || ((c.cognome || '') + ' ' + (c.nome || ''))).toLowerCase().trim();
+            if (cName === nome) { candidates.push({ id: c.id, name: cName }); return; }
+            var words = nome.split(/\s+/);
+            if (words.length >= 2 && (words.every(function(w) { return cName.includes(w); }) || cName.split(/\s+/).every(function(w) { return nome.includes(w); }))) {
+                candidates.push({ id: c.id, name: cName });
+            }
+        });
+        // Remove duplicates
+        var uniqueC = [];
+        var seenIds = [];
+        candidates.forEach(function(c) {
+            if (seenIds.indexOf(c.id) === -1) { uniqueC.push(c); seenIds.push(c.id); }
+        });
+        if (uniqueC.length === 1) {
+            return { level: 'L4', confidence: 85, cliente: uniqueC[0].name, clienteId: uniqueC[0].id, message: 'Match L4 (Fuzzy): ' + uniqueC[0].name, isNew: false };
+        }
+        if (uniqueC.length > 1) {
+            return { level: 'L4', confidence: 70, cliente: null, message: 'Ambiguità: ' + uniqueC.length + ' candidati', candidates: uniqueC, isNew: false, disambigua: true };
+        }
+    }
+
+    return { level: 'NONE', confidence: 0, cliente: null, message: 'Nessun match — Nuovo cliente', isNew: true };
+}
+
+// ─── NAMING CONVENTION ───
+function generateFileNameV2(data) {
+    var comp = (data.compagnia || 'SenzaCompagnia').replace(/\s+/g, '').replace(/S\.p\.A\./i, '').replace(/Assicurazioni/i, '').trim();
+    var targa = data.targa || data.tipoGaranzia || 'Altro';
+    var nome = (data.cliente || 'SenzaNome').replace(/[^\w\sàèéìòù]/g, '').replace(/\s+/g, '_').replace(/_+/g, '_');
+    if (nome.length > 30) nome = nome.substring(0, 30);
+    var scad = (data.scadenza || '').replace(/-/g, '');
+    return comp + '_' + targa + '_' + nome + '_' + scad + '.pdf';
+}
+
+// ─── POPULATE FORM ───
+function populateExtractionFormV2(data, match) {
+    // Client fields
+    document.getElementById('pdf_nominativo').value = data.cliente || '';
+    document.getElementById('pdf_cf').value = data.cf || '';
+    document.getElementById('pdf_piva').value = data._piva || '';
+    if (!data._piva && data.cf && /^\d{11}$/.test(data.cf)) {
+        document.getElementById('pdf_piva').value = data.cf;
+        document.getElementById('pdf_cf').value = '';
+    }
+    document.getElementById('pdf_telefono').value = data.telefono || '';
+    document.getElementById('pdf_email').value = data.email || '';
+    document.getElementById('pdf_indirizzo').value = data.indirizzo || '';
+
+    // Policy fields
+    document.getElementById('pdf_compagnia').value = data.compagnia || '';
+    document.getElementById('pdf_numPolizza').value = data.numPolizza || '';
+    document.getElementById('pdf_targa').value = data.targa || '';
+    document.getElementById('pdf_veicolo').value = data.veicolo || '';
+    document.getElementById('pdf_decorrenza').value = data.decorrenza || '';
+    document.getElementById('pdf_scadenza').value = data.scadenza || '';
+
+    // Frazionamento
+    if (data.frazionamento) document.getElementById('pdf_frazionamento').value = data.frazionamento;
+
+    // Ramo
+    if (data.tipoGaranzia) {
+        var sel = document.getElementById('pdf_ramo');
+        var found = false;
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value.toLowerCase() === data.tipoGaranzia.toLowerCase() ||
+                sel.options[i].text.toLowerCase().includes(data.tipoGaranzia.toLowerCase())) {
+                sel.selectedIndex = i; found = true; break;
+            }
+        }
+        if (!found && data.targa) sel.value = 'RC Auto';
+    } else if (data.targa) {
+        document.getElementById('pdf_ramo').value = 'RC Auto';
+    }
+
+    // Collaboratore dropdown
+    var collSel = document.getElementById('pdf_collaboratore');
+    if (collSel && cache.collaboratori) {
+        collSel.innerHTML = '<option value="">— Nessuno —</option>' +
+            cache.collaboratori.map(function(c) {
+                return '<option value="' + c.id + '">' + (c.cognome || '') + ' ' + (c.nome || '') + '</option>';
+            }).join('');
+    }
+
+    // Importi
+    document.getElementById('pdf_imponibile').value = data._premioNetto || '';
+    document.getElementById('pdf_ssn').value = data._importoSSN || '';
+    document.getElementById('pdf_tasse').value = data._importoImposte || '';
+    document.getElementById('pdf_premioLordo').value = data.premio || '';
+
+    // Garanzie
+    var garEl = document.getElementById('pdfGaranzieList');
+    var garArea = document.getElementById('pdfGaranzieArea');
+    var garanzie = data._garanzie && data._garanzie.length > 0 ? data._garanzie : [];
+    if (garanzie.length > 0) {
+        garArea.style.display = 'block';
+        garEl.innerHTML = garanzie.map(function(g) {
+            return '<span style="display:inline-block;background:rgba(0,196,180,.2);color:#00c4b4;padding:3px 10px;border-radius:12px;font-size:12px;margin:3px 3px 3px 0;">' + esc(g) + '</span>';
+        }).join('');
+    } else {
+        garArea.style.display = 'none';
+    }
+
+    // Confidence badges
+    var confMap = {
+        nom: data.cliente, cf: data.cf, comp: data.compagnia, pol: data.numPolizza
+    };
+    Object.keys(confMap).forEach(function(key) {
+        var el = document.getElementById('conf_' + key);
+        if (el) {
+            if (confMap[key]) {
+                el.textContent = '✅ trovato';
+                el.className = 'badge badge-success';
+                el.style.fontSize = '10px';
+            } else {
+                el.textContent = '— mancante';
+                el.className = 'badge badge-warning';
+                el.style.fontSize = '10px';
+            }
+        }
+    });
+
+    // Math check
+    recalcPDFTotals();
+
+    // Naming
+    document.getElementById('pdfNewName').textContent = generateFileNameV2(data);
+
+    // DB Match result
+    renderMatchResultV2(match);
+}
+
+function recalcPDFTotals() {
+    var imp = parseFloat(document.getElementById('pdf_imponibile').value) || 0;
+    var ssn = parseFloat(document.getElementById('pdf_ssn').value) || 0;
+    var tax = parseFloat(document.getElementById('pdf_tasse').value) || 0;
+    var lordo = parseFloat(document.getElementById('pdf_premioLordo').value) || 0;
+    var calc = imp + ssn + tax;
+    var diff = Math.abs(lordo - calc);
+    var el = document.getElementById('pdfMathCheck');
+    if (!el) return;
+
+    if (lordo === 0) {
+        el.textContent = '';
+    } else if (diff <= 0.02) {
+        el.innerHTML = '✅ OK';
+        el.style.color = '#22c55e';
+    } else if (diff <= 1) {
+        el.innerHTML = '⚠️ ~' + diff.toFixed(2) + '€';
+        el.style.color = '#f59e0b';
+    } else {
+        el.innerHTML = '🛑 ' + diff.toFixed(2) + '€';
+        el.style.color = '#ef4444';
+    }
+
+    // Update naming live
+    if (currentPDFData && currentPDFData.extracted) {
+        currentPDFData.extracted.compagnia = document.getElementById('pdf_compagnia').value;
+        currentPDFData.extracted.targa = document.getElementById('pdf_targa').value;
+        currentPDFData.extracted.cliente = document.getElementById('pdf_nominativo').value;
+        currentPDFData.extracted.scadenza = document.getElementById('pdf_scadenza').value;
+        document.getElementById('pdfNewName').textContent = generateFileNameV2(currentPDFData.extracted);
+    }
+}
+
+function renderMatchResultV2(match) {
+    var el = document.getElementById('pdfMatchResult');
+    if (!el) return;
+    el.style.display = 'block';
+
+    if (match.isNew) {
+        el.style.background = 'rgba(245,158,11,.1)';
+        el.style.border = '1px solid rgba(245,158,11,.3)';
+        el.innerHTML = '<div style="font-weight:700;color:#f59e0b;">🆕 Cliente non trovato nel database</div><div style="font-size:11px;margin-top:4px;color:var(--fim-text-light)">Il salvataggio creerà automaticamente un nuovo cliente e una nuova polizza in Supabase.</div>';
+    } else if (match.disambigua) {
+        el.style.background = 'rgba(245,158,11,.1)';
+        el.style.border = '1px solid rgba(245,158,11,.3)';
+        el.innerHTML = '<div style="font-weight:700;color:#f59e0b;">🔍 Ambiguità: ' + match.candidates.length + ' candidati</div><div style="margin-top:8px;">' +
+            match.candidates.map(function(c, i) {
+                return '<label style="display:block;padding:4px 0;cursor:pointer;"><input type="radio" name="matchCandidate" value="' + c.id + '" ' + (i === 0 ? 'checked' : '') + '> ' + esc(c.name) + '</label>';
+            }).join('') +
+            '<label style="display:block;padding:4px 0;cursor:pointer;"><input type="radio" name="matchCandidate" value="__new__"> 🆕 Crea nuovo</label></div>';
+    } else {
+        el.style.background = 'rgba(34,197,94,.1)';
+        el.style.border = '1px solid rgba(34,197,94,.3)';
+        var existingCount = cache.polizze.filter(function(p) { return p.cliente_id === match.clienteId; }).length;
+        el.innerHTML = '<div style="font-weight:700;color:#22c55e;">✅ Match ' + match.level + ' — ' + esc(match.cliente) + '</div><div style="font-size:11px;margin-top:4px;color:var(--fim-text-light)">Confidence: ' + match.confidence + '% | Polizze esistenti: ' + existingCount + '</div>';
+    }
+}
+
+// ─── SAVE TO SUPABASE ───
+async function savePDFExtraction() {
+    if (!sbClient) { toast('Configura prima Supabase nelle Impostazioni', 'error'); return; }
+
+    var nominativo = document.getElementById('pdf_nominativo').value.trim();
+    var numPolizza = document.getElementById('pdf_numPolizza').value.trim();
+    if (!nominativo) { toast('Nominativo cliente obbligatorio', 'error'); return; }
+    if (!numPolizza) { toast('Numero polizza obbligatorio', 'error'); return; }
+
+    var btn = document.getElementById('btnSavePDF');
+    btn.disabled = true;
+    btn.textContent = '⏳ Salvataggio...';
+
+    try {
+        var clienteId = null;
+        var match = currentPDFData ? currentPDFData.match : null;
+
+        // Determine client ID
+        if (match && match.clienteId) {
+            clienteId = match.clienteId;
+        } else if (match && match.disambigua) {
+            var selected = document.querySelector('input[name="matchCandidate"]:checked');
+            if (selected && selected.value !== '__new__') {
+                clienteId = parseInt(selected.value);
+            }
+        }
+
+        // Create new client if needed
+        if (!clienteId) {
+            var cf = document.getElementById('pdf_cf').value.trim();
+            var piva = document.getElementById('pdf_piva').value.trim();
+            var nameParts = nominativo.split(/\s+/);
+            var cognome = nameParts[0] || '';
+            var nome = nameParts.slice(1).join(' ') || '';
+
+            var newCliente = {
+                cognome: cognome,
+                nome: nome,
+                codice_fiscale: cf || null,
+                partita_iva: piva || null,
+                tipo: piva ? 'azienda' : 'privato',
+                telefono: document.getElementById('pdf_telefono').value || null,
+                email: document.getElementById('pdf_email').value || null,
+                indirizzo: document.getElementById('pdf_indirizzo').value || null
+            };
+
+            // If it looks like a company (S.R.L., S.P.A., etc.)
+            if (/S\.?R\.?L|S\.?P\.?A|S\.?N\.?C|S\.?A\.?S|S\.?R\.?L\.?S/i.test(nominativo)) {
+                newCliente.ragione_sociale = nominativo;
+                newCliente.tipo = 'azienda';
+                newCliente.cognome = null;
+                newCliente.nome = null;
+            }
+
+            var { data: inserted, error: insErr } = await sbClient.from('clienti').insert(newCliente).select().single();
+            if (insErr) throw new Error('Errore creazione cliente: ' + insErr.message);
+            clienteId = inserted.id;
+            toast('🆕 Nuovo cliente creato: ' + nominativo, 'success');
+            await loadClienti(); // Refresh cache
+        }
+
+        // Match compagnia
+        var compName = document.getElementById('pdf_compagnia').value.trim();
+        var compagniaId = null;
+        if (compName) {
+            var compMatch = cache.compagnie.find(function(c) {
+                return c.nome.toLowerCase().includes(compName.toLowerCase()) || compName.toLowerCase().includes(c.nome.toLowerCase());
+            });
+            if (compMatch) compagniaId = compMatch.id;
+        }
+
+        // Match ramo
+        var ramoName = document.getElementById('pdf_ramo').value;
+        var ramoId = null;
+        if (ramoName) {
+            var ramoMatch = cache.rami.find(function(r) {
+                return r.nome.toLowerCase().includes(ramoName.toLowerCase()) || ramoName.toLowerCase().includes(r.nome.toLowerCase());
+            });
+            if (ramoMatch) ramoId = ramoMatch.id;
+        }
+
+        // Get collaboratore
+        var collabId = document.getElementById('pdf_collaboratore').value || null;
+
+        // Build polizza object for Supabase
+        var newPolizza = {
+            cliente_id: clienteId,
+            compagnia_id: compagniaId,
+            ramo_id: ramoId,
+            collaboratore_id: collabId ? parseInt(collabId) : null,
+            numero_polizza: numPolizza,
+            targa: document.getElementById('pdf_targa').value || null,
+            data_decorrenza: document.getElementById('pdf_decorrenza').value || null,
+            data_scadenza: document.getElementById('pdf_scadenza').value || null,
+            premio_lordo: parseFloat(document.getElementById('pdf_premioLordo').value) || 0,
+            premio_imponibile: parseFloat(document.getElementById('pdf_imponibile').value) || 0,
+            imposte: parseFloat(document.getElementById('pdf_tasse').value) || 0,
+            ssn: parseFloat(document.getElementById('pdf_ssn').value) || 0,
+            frazionamento: document.getElementById('pdf_frazionamento').value || 'Annuale',
+            stato: 'attiva',
+            note: 'Importato via Agente AI PDF — ' + (currentPDFData ? currentPDFData.originalName : '') +
+                (document.getElementById('pdf_veicolo').value ? ' — Veicolo: ' + document.getElementById('pdf_veicolo').value : '')
+        };
+
+        var { data: savedPol, error: polErr } = await sbClient.from('polizze').insert(newPolizza).select().single();
+        if (polErr) throw new Error('Errore salvataggio polizza: ' + polErr.message);
+
+        lastSavedPDFId = savedPol.id;
+        btn.style.display = 'none';
+        document.getElementById('btnUndoPDF').style.display = 'inline-flex';
+
+        toast('✅ Polizza salvata: ' + numPolizza + ' — ' + nominativo, 'success');
+        addAgentLog(currentPDFData ? currentPDFData.originalName : 'PDF', currentPDFData ? currentPDFData.extracted : {}, { message: 'Salvato in Supabase (ID: ' + savedPol.id + ')' }, true);
+
+        // Refresh data
+        await loadPolizze();
+
+    } catch (err) {
+        toast('Errore salvataggio: ' + err.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '💾 Salva in Supabase';
+}
+
+async function undoLastPDFSave() {
+    if (!lastSavedPDFId || !sbClient) { toast('Nessun salvataggio da annullare', 'error'); return; }
+
+    try {
+        var { error } = await sbClient.from('polizze').delete().eq('id', lastSavedPDFId);
+        if (error) throw error;
+
+        toast('↩️ Polizza annullata (ID: ' + lastSavedPDFId + ')', 'success');
+        addAgentLog('Undo', {}, { message: 'Polizza #' + lastSavedPDFId + ' ANNULLATA' }, false);
+        lastSavedPDFId = null;
+        document.getElementById('btnUndoPDF').style.display = 'none';
+        document.getElementById('btnSavePDF').style.display = 'inline-flex';
+
+        await loadPolizze();
+    } catch (err) {
+        toast('Errore annullamento: ' + err.message, 'error');
+    }
+}
+
+function resetPDFAgent() {
+    document.getElementById('pdfResultsArea').style.display = 'none';
+    document.getElementById('pdfProgressArea').style.display = 'none';
+    document.getElementById('pdfDebugArea').style.display = 'none';
+    document.getElementById('pdfFileInput').value = '';
+    document.getElementById('btnSavePDF').style.display = 'inline-flex';
+    document.getElementById('btnUndoPDF').style.display = 'none';
+    currentPDFData = null;
+    lastSavedPDFId = null;
+    document.getElementById('pdfDropZone').style.borderColor = '';
+}
+
+// ─── STATS & LOG ───
+function updateAgentStats() {
+    document.getElementById('agStatTotal').textContent = agentPDFStats.total;
+    document.getElementById('agStatOK').textContent = agentPDFStats.ok;
+    document.getElementById('agStatWarn').textContent = agentPDFStats.warn;
+    document.getElementById('agStatFail').textContent = agentPDFStats.fail;
+    var acc = agentPDFStats.total > 0 ? Math.round(agentPDFStats.accuracySum / agentPDFStats.total) : 0;
+    document.getElementById('agStatAccuracy').textContent = agentPDFStats.total > 0 ? acc + '%' : '—';
+}
+
+function addAgentLog(fileName, extracted, match, saved) {
+    var logEl = document.getElementById('agentPDFLog');
+    var now = new Date().toLocaleTimeString('it-IT');
+    var icon = saved ? '💾' : (match && match.isNew ? '🆕' : '📄');
+    var fmt = extracted ? (extracted._detectedFormat || 'REGEX') : '—';
+    var entry = '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<span style="color:var(--fim-text-light)">' + now + '</span> ' + icon + ' ' +
+        '<strong>' + esc(fileName || '—') + '</strong>' +
+        ' <span style="color:var(--fim-accent);font-size:10px">[' + fmt + ']</span>' +
+        (match ? ' — ' + esc(match.message || '') : '') +
+        '</div>';
+    logEl.innerHTML = entry + logEl.innerHTML;
 }
 </script>
 
