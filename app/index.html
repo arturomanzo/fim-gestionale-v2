@@ -316,6 +316,13 @@
             vertical-align: middle;
         }
 
+        /* === FIMA DOCUMENTI === */
+        .doc-template:hover { border-color: var(--fim-accent) !important; transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,196,180,.15); }
+        #docContent h1, #docContent h2, #docContent h3 { color: #1a3a5c; }
+        #docContent table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        #docContent th, #docContent td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; font-size: 13px; }
+        #docContent th { background: #1a3a5c; color: #fff; }
+
         /* === BADGES / STATUS === */
         .badge {
             display: inline-flex; align-items: center;
@@ -803,6 +810,9 @@
             </a>
 
             <div class="nav-section">Strumenti</div>
+            <a onclick="navigateTo('documenti')" data-page="documenti">
+                <span class="nav-icon">&#x1F4C4;</span> FIMA Documenti
+            </a>
             <a onclick="navigateTo('report')" data-page="report">
                 <span class="nav-icon">&#x1F4C8;</span> Report
             </a>
@@ -1201,6 +1211,95 @@
                         <p style="font-size:13px;color:var(--fim-text-light)">Sinistri aperti e loss ratio per ramo</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- ======== FIMA DOCUMENTI ======== -->
+            <div id="page-documenti" class="page">
+                <h1 class="page-title">FIMA Documenti</h1>
+                <p class="page-subtitle">Genera documenti professionali con AI — precompilati dai dati del gestionale</p>
+
+                <!-- Template Gallery -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px">
+
+                    <div class="card doc-template" onclick="openDocGen('nomina')" style="cursor:pointer;border:2px solid transparent;transition:.2s">
+                        <div style="font-size:28px;margin-bottom:8px">📋</div>
+                        <h3 style="font-size:15px;margin-bottom:6px">Lettera di Nomina Subagente</h3>
+                        <p style="font-size:12px;color:var(--fim-text-light)">Incarico collaboratore Sez. E RUI con clausole chargeback, GDPR e provvigioni</p>
+                        <span style="font-size:11px;background:rgba(0,196,180,.15);color:#00c4b4;padding:2px 8px;border-radius:4px;margin-top:8px;display:inline-block">Reg. IVASS 40/2018</span>
+                    </div>
+
+                    <div class="card doc-template" onclick="openDocGen('disdetta')" style="cursor:pointer;border:2px solid transparent;transition:.2s">
+                        <div style="font-size:28px;margin-bottom:8px">✉️</div>
+                        <h3 style="font-size:15px;margin-bottom:6px">Lettera di Disdetta Polizza</h3>
+                        <p style="font-size:12px;color:var(--fim-text-light)">Comunicazione disdetta alla compagnia per conto del cliente</p>
+                        <span style="font-size:11px;background:rgba(0,196,180,.15);color:#00c4b4;padding:2px 8px;border-radius:4px;margin-top:8px;display:inline-block">Art. 1899 c.c.</span>
+                    </div>
+
+                    <div class="card doc-template" onclick="openDocGen('informativa')" style="cursor:pointer;border:2px solid transparent;transition:.2s">
+                        <div style="font-size:28px;margin-bottom:8px">📄</div>
+                        <h3 style="font-size:15px;margin-bottom:6px">Informativa Precontrattuale IDD</h3>
+                        <p style="font-size:12px;color:var(--fim-text-light)">Allegati 3, 3-ter, 4 e 4-ter secondo Regolamento IVASS 40/2018</p>
+                        <span style="font-size:11px;background:rgba(0,196,180,.15);color:#00c4b4;padding:2px 8px;border-radius:4px;margin-top:8px;display:inline-block">IDD / CAP art. 120-bis</span>
+                    </div>
+
+                    <div class="card doc-template" onclick="openDocGen('reclamo')" style="cursor:pointer;border:2px solid transparent;transition:.2s">
+                        <div style="font-size:28px;margin-bottom:8px">⚠️</div>
+                        <h3 style="font-size:15px;margin-bottom:6px">Risposta a Reclamo</h3>
+                        <p style="font-size:12px;color:var(--fim-text-light)">Risposta formale entro 45gg con motivazioni e indicazione ricorso IVASS</p>
+                        <span style="font-size:11px;background:rgba(0,196,180,.15);color:#00c4b4;padding:2px 8px;border-radius:4px;margin-top:8px;display:inline-block">Reg. IVASS 40/2018 art. 7</span>
+                    </div>
+
+                    <div class="card doc-template" onclick="openDocGen('quietanza')" style="cursor:pointer;border:2px solid transparent;transition:.2s">
+                        <div style="font-size:28px;margin-bottom:8px">💰</div>
+                        <h3 style="font-size:15px;margin-bottom:6px">Quietanza di Pagamento</h3>
+                        <p style="font-size:12px;color:var(--fim-text-light)">Ricevuta premio assicurativo con dettaglio imposte e competenze</p>
+                        <span style="font-size:11px;background:rgba(0,196,180,.15);color:#00c4b4;padding:2px 8px;border-radius:4px;margin-top:8px;display:inline-block">D.Lgs. 209/2005</span>
+                    </div>
+
+                    <div class="card doc-template" onclick="openDocGen('estratto')" style="cursor:pointer;border:2px solid transparent;transition:.2s">
+                        <div style="font-size:28px;margin-bottom:8px">📊</div>
+                        <h3 style="font-size:15px;margin-bottom:6px">Estratto Conto Provvigionale</h3>
+                        <p style="font-size:12px;color:var(--fim-text-light)">Riepilogo provvigioni maturate per collaboratore con dettaglio polizze</p>
+                        <span style="font-size:11px;background:rgba(0,196,180,.15);color:#00c4b4;padding:2px 8px;border-radius:4px;margin-top:8px;display:inline-block">Amministrativo</span>
+                    </div>
+
+                    <div class="card doc-template" onclick="openDocGen('libero')" style="cursor:pointer;border:2px solid transparent;transition:.2s">
+                        <div style="font-size:28px;margin-bottom:8px">🤖</div>
+                        <h3 style="font-size:15px;margin-bottom:6px">Documento Libero (AI)</h3>
+                        <p style="font-size:12px;color:var(--fim-text-light)">Descrivi cosa ti serve e FIMA genera il documento completo con intestazione FIM</p>
+                        <span style="font-size:11px;background:rgba(245,158,11,.15);color:#f59e0b;padding:2px 8px;border-radius:4px;margin-top:8px;display:inline-block">FIMA AI</span>
+                    </div>
+
+                </div>
+
+                <!-- Document Generator Area -->
+                <div id="docGenArea" style="display:none">
+                    <div class="card">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                            <h3 id="docGenTitle" style="font-size:16px"></h3>
+                            <button class="btn btn-secondary btn-sm" onclick="closeDocGen()">✕ Chiudi</button>
+                        </div>
+
+                        <!-- Dynamic form -->
+                        <div id="docGenForm"></div>
+
+                        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+                            <button class="btn btn-primary" onclick="generateDocument()" id="btnGenerate">🤖 Genera con FIMA</button>
+                            <button class="btn btn-secondary" onclick="copyDocToClipboard()" id="btnCopyDoc" style="display:none">📋 Copia</button>
+                            <button class="btn btn-secondary" onclick="printDoc()" id="btnPrintDoc" style="display:none">🖨️ Stampa / PDF</button>
+                        </div>
+                    </div>
+
+                    <!-- Generated document preview -->
+                    <div id="docPreview" class="card" style="display:none;margin-top:16px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                            <h3 style="font-size:14px;color:var(--fim-accent)">📄 Anteprima Documento</h3>
+                            <span id="docGenStatus" style="font-size:12px;color:var(--fim-text-light)"></span>
+                        </div>
+                        <div id="docContent" style="background:#fff;color:#1a1a1a;padding:40px;border-radius:8px;font-family:'Times New Roman',serif;font-size:14px;line-height:1.7;max-height:800px;overflow-y:auto"></div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- ======== IMPOSTAZIONI ======== -->
@@ -2390,6 +2489,399 @@ Posso rispondere a:<br>
 &#x2022; <strong>Cross-selling</strong> opportunita<br>
 &#x2022; <strong>Compagnie</strong> distribuzione<br><br>
 <em>Per risposte avanzate, configura l'API Anthropic nelle Impostazioni.</em>`;
+}
+
+// ============================================================
+// FIMA DOCUMENTI — Generatore Documenti AI
+// ============================================================
+
+const DOC_TEMPLATES = {
+    nomina: {
+        title: 'Lettera di Nomina Subagente',
+        fields: [
+            { id: 'doc_collab', label: 'Collaboratore', type: 'select_collab', required: true },
+            { id: 'doc_territorio', label: 'Territorio assegnato', type: 'text', placeholder: 'Es. Provincia di Latina e Roma' },
+            { id: 'doc_compagnie', label: 'Compagnie autorizzate', type: 'text', placeholder: 'Es. Allianz, Prima, Bene Assicurazioni' },
+            { id: 'doc_provv', label: 'Percentuale provvigione', type: 'text', placeholder: 'Es. 50% delle provvigioni FIM' },
+            { id: 'doc_esclusiva', label: 'Tipo incarico', type: 'select', options: ['Non esclusivo', 'Esclusivo'] },
+            { id: 'doc_note', label: 'Note aggiuntive', type: 'textarea', placeholder: 'Clausole particolari, limitazioni...' }
+        ],
+        systemPrompt: `Genera una LETTERA DI NOMINA SUBAGENTE professionale per FIM Insurance Broker S.A.S.
+Segui questa struttura OBBLIGATORIA:
+1. Intestazione FIM completa: FIM INSURANCE BROKER S.A.S. | RUI Sez. B N. B000405449 | Via Roma 41, 04012 Cisterna di Latina (LT)
+2. Data e numero progressivo documento
+3. Dati completi del subagente (nome, cognome, CF, RUI Sez. E se disponibile)
+4. Oggetto: "Nomina quale Collaboratore — Sezione E del RUI"
+5. Corpo con: incarico, territorio, compagnie autorizzate, percentuale provvigioni
+6. Clausole OBBLIGATORIE:
+   - Responsabilità solidale FIM per atti del subagente (art. 109 D.Lgs. 209/2005 CAP)
+   - Obbligo aggiornamento professionale (Reg. IVASS 6/2014, 15 ore/anno)
+   - Divieto raccolta premi diretti salvo autorizzazione scritta
+   - Clausola chargeback: recupero provvigioni su polizze annullate entro 6 mesi
+   - GDPR: designazione come Responsabile Trattamento (art. 28 Reg. UE 679/2016)
+   - Riservatezza e non concorrenza
+7. Riferimenti normativi: D.Lgs. 209/2005 art. 109, Reg. IVASS 40/2018
+8. Spazio firme: FIM (timbro + firma legale rappresentante Arturo Manzo) + subagente
+9. Footer: FIM Insurance Broker S.A.S. — P.IVA — RUI Sez. B N. B000405449
+
+Formatta in HTML professionale con stile da documento legale italiano. Usa <h2> per intestazione, <p> per paragrafi, <ol>/<li> per clausole numerate. NO markdown.`
+    },
+
+    disdetta: {
+        title: 'Lettera di Disdetta Polizza',
+        fields: [
+            { id: 'doc_polizza', label: 'Polizza', type: 'select_polizza', required: true },
+            { id: 'doc_motivo', label: 'Motivo disdetta', type: 'select', options: ['Scadenza naturale', 'Sinistro (art. 1898 c.c.)', 'Variazione rischio', 'Recesso anticipato', 'Trasferimento ad altra compagnia'] },
+            { id: 'doc_note', label: 'Note aggiuntive', type: 'textarea', placeholder: 'Motivazioni specifiche...' }
+        ],
+        systemPrompt: `Genera una LETTERA DI DISDETTA POLIZZA professionale per FIM Insurance Broker S.A.S.
+Struttura:
+1. Intestazione FIM: FIM INSURANCE BROKER S.A.S. | RUI Sez. B N. B000405449 | Via Roma 41, 04012 Cisterna di Latina
+2. Destinatario: la compagnia assicurativa (nome, indirizzo se disponibile)
+3. Data e riferimenti
+4. Oggetto: "Disdetta polizza n. [numero] — Contraente: [nome cliente]"
+5. Corpo: comunicazione formale di disdetta con riferimento art. 1899 c.c., data effetto, richiesta conferma
+6. Richiesta di rimborso rateo premio se applicabile
+7. Firma: Arturo Manzo — FIM Insurance Broker S.A.S.
+8. Footer con RUI e riferimento IVASS
+
+Formatta in HTML professionale. NO markdown.`
+    },
+
+    informativa: {
+        title: 'Informativa Precontrattuale IDD',
+        fields: [
+            { id: 'doc_cliente', label: 'Cliente', type: 'select_cliente', required: true },
+            { id: 'doc_ramo', label: 'Ramo assicurativo', type: 'select', options: ['RC Auto', 'Vita', 'Infortuni', 'Casa/Patrimonio', 'RC Professionale', 'Aziende/Multirischio', 'Trasporti'] },
+            { id: 'doc_note', label: 'Note specifiche', type: 'textarea', placeholder: 'Dettagli prodotto, esigenze specifiche...' }
+        ],
+        systemPrompt: `Genera un'INFORMATIVA PRECONTRATTUALE IDD completa per FIM Insurance Broker S.A.S.
+SEZIONI OBBLIGATORIE per legge (D.Lgs. 209/2005 art. 120-bis, Reg. IVASS 40/2018):
+
+1. IDENTITA' E NATURA DEL DISTRIBUTORE
+   - FIM Insurance Broker S.A.S. — Broker assicurativo
+   - Iscritto RUI Sez. B N. B000405449
+   - Sede: Via Roma 41, 04012 Cisterna di Latina (LT)
+   - Non rappresenta alcuna compagnia — opera nell'interesse del cliente
+
+2. REGISTRO INTERMEDIARI
+   - Iscrizione verificabile su: https://servizi.ivass.it/RuirPubblica/
+
+3. NATURA DELLA CONSULENZA
+   - Consulenza NON indipendente (art. 119-ter CAP)
+   - FIM e' remunerato tramite provvigioni dalle compagnie (non dal cliente)
+
+4. CONFLITTI DI INTERESSE E REMUNERAZIONE
+   - FIM percepisce provvigioni dalle compagnie partner
+   - Il cliente NON paga alcun compenso diretto a FIM
+   - Trasparenza: su richiesta, FIM comunica l'ammontare della provvigione
+
+5. PROCEDURA RECLAMI (Reg. IVASS 40/2018 art. 7)
+   - Reclamo scritto a: FIM Insurance Broker, Via Roma 41, 04012 Cisterna di Latina
+   - Risposta entro 45 giorni
+   - In caso di mancata risposta: ricorso IVASS o Arbitro Assicurativo (fino a EUR 15.000)
+
+6. INFORMATIVA PRIVACY (art. 13 GDPR 679/2016)
+   - Titolare: FIM Insurance Broker S.A.S.
+   - Finalita': esecuzione intermediazione, obblighi di legge, prevenzione frodi
+   - Conservazione: durata rapporto + 10 anni
+
+7. VALUTAZIONE DELLE ESIGENZE DEL CLIENTE (POG — Reg. IVASS 45/2020)
+   - Descrizione esigenze assicurative rilevate
+   - Coerenza del prodotto proposto con il profilo del cliente
+
+Formatta in HTML professionale con sezioni numerate. Includi spazio per firma cliente e data. NO markdown.`
+    },
+
+    reclamo: {
+        title: 'Risposta a Reclamo',
+        fields: [
+            { id: 'doc_cliente', label: 'Cliente reclamante', type: 'select_cliente', required: true },
+            { id: 'doc_polizza', label: 'Polizza di riferimento (opzionale)', type: 'select_polizza' },
+            { id: 'doc_data_reclamo', label: 'Data ricezione reclamo', type: 'date' },
+            { id: 'doc_oggetto_reclamo', label: 'Oggetto del reclamo', type: 'textarea', required: true, placeholder: 'Descrivi il contenuto del reclamo ricevuto...' },
+            { id: 'doc_esito', label: 'Esito', type: 'select', options: ['Accolto', 'Parzialmente accolto', 'Respinto'] },
+            { id: 'doc_note', label: 'Motivazioni / azioni intraprese', type: 'textarea', placeholder: 'Dettagli sulla risposta...' }
+        ],
+        systemPrompt: `Genera una RISPOSTA A RECLAMO formale per FIM Insurance Broker S.A.S.
+Rispettare Reg. IVASS 40/2018 art. 7 (tempo massimo risposta: 45 giorni).
+
+Struttura:
+1. Intestazione FIM completa con RUI
+2. Data (entro 45gg dalla ricezione)
+3. Dati reclamante e riferimenti polizza
+4. Oggetto: "Riscontro al reclamo del [data] — Prot. [numero]"
+5. Corpo:
+   - Riepilogo del reclamo ricevuto
+   - Attivita' di verifica svolte
+   - Esito motivato (accolto/respinto/parziale)
+   - Eventuali azioni correttive adottate
+6. Indicazione possibilità di ricorso:
+   - IVASS: Servizio Tutela del Consumatore, Via del Quirinale 21, 00187 Roma
+   - Arbitro Assicurativo (controversie fino a EUR 15.000)
+   - Mediazione/Negoziazione assistita
+7. Firma Arturo Manzo
+8. Footer con RUI e P.IVA
+
+Tono: formale, rispettoso, completo. Formatta in HTML. NO markdown.`
+    },
+
+    quietanza: {
+        title: 'Quietanza di Pagamento',
+        fields: [
+            { id: 'doc_polizza', label: 'Polizza', type: 'select_polizza', required: true },
+            { id: 'doc_importo', label: 'Importo incassato (EUR)', type: 'number', placeholder: '0.00' },
+            { id: 'doc_metodo', label: 'Metodo pagamento', type: 'select', options: ['Bonifico bancario', 'Carta di credito', 'Assegno', 'Contanti', 'POS'] },
+            { id: 'doc_note', label: 'Note', type: 'textarea', placeholder: 'Rata, periodo copertura...' }
+        ],
+        systemPrompt: `Genera una QUIETANZA DI PAGAMENTO professionale per FIM Insurance Broker S.A.S.
+Struttura:
+1. Intestazione FIM con RUI B000405449
+2. "QUIETANZA DI PAGAMENTO PREMIO ASSICURATIVO" (titolo grande)
+3. Numero quietanza: Q/2026/[progressivo]
+4. Dati contraente (nome, CF/P.IVA, indirizzo)
+5. Dati polizza (numero, compagnia, ramo, decorrenza-scadenza)
+6. Dettaglio importi:
+   - Premio netto / imponibile
+   - Imposte (aliquota %)
+   - SSN (se applicabile)
+   - Competenze accessorie
+   - TOTALE INCASSATO
+7. Metodo e data pagamento
+8. Dichiarazione: "FIM Insurance Broker dichiara di aver ricevuto la somma di EUR [importo]..."
+9. Firma e timbro FIM
+10. IBAN FIM per eventuale bonifico: IT89F0306939490100000008302
+Formatta in HTML con tabella per importi. NO markdown.`
+    },
+
+    estratto: {
+        title: 'Estratto Conto Provvigionale',
+        fields: [
+            { id: 'doc_collab', label: 'Collaboratore', type: 'select_collab', required: true },
+            { id: 'doc_periodo_da', label: 'Periodo dal', type: 'date' },
+            { id: 'doc_periodo_a', label: 'Periodo al', type: 'date' },
+            { id: 'doc_note', label: 'Note', type: 'textarea', placeholder: 'Trattenute, anticipi, note...' }
+        ],
+        systemPrompt: `Genera un ESTRATTO CONTO PROVVIGIONALE per FIM Insurance Broker S.A.S.
+Struttura:
+1. Intestazione FIM con RUI B000405449
+2. "ESTRATTO CONTO PROVVIGIONALE" — Periodo: [da] - [al]
+3. Dati collaboratore: codice, nome, RUI Sez. E, indirizzo
+4. Tabella polizze (HTML table con stile):
+   Colonne: N. Polizza | Cliente | Compagnia | Ramo | Premio | Imponibile | % Provv. | Provvigione
+5. TOTALI: Totale Premi | Totale Imponibile | Totale Provvigioni
+6. Eventuali trattenute (chargeback, anticipi, oneri gestione)
+7. NETTO A PAGARE
+8. Modalita' pagamento: Bonifico su IBAN del collaboratore — Causale: "Provvigioni [periodo] — [codice collab]"
+9. Firma Arturo Manzo
+Formatta in HTML con tabelle professionali. NO markdown.`
+    },
+
+    libero: {
+        title: 'Documento Libero (AI)',
+        fields: [
+            { id: 'doc_tipo_libero', label: 'Tipo documento', type: 'text', required: true, placeholder: 'Es. Lettera al cliente, circolare interna, proposta...' },
+            { id: 'doc_cliente', label: 'Cliente (opzionale)', type: 'select_cliente' },
+            { id: 'doc_polizza', label: 'Polizza (opzionale)', type: 'select_polizza' },
+            { id: 'doc_descrizione', label: 'Descrizione dettagliata', type: 'textarea', required: true, placeholder: 'Descrivi cosa deve contenere il documento, destinatario, scopo...' }
+        ],
+        systemPrompt: `Genera un documento professionale per FIM Insurance Broker S.A.S. secondo le indicazioni dell'utente.
+REGOLE:
+1. SEMPRE intestazione FIM: FIM INSURANCE BROKER S.A.S. | Intermediario Assicurativo | RUI Sez. B N. B000405449 | Via Roma 41, 04012 Cisterna di Latina (LT)
+2. Data del documento
+3. Tono professionale italiano da intermediario assicurativo
+4. Se pertinente, citare riferimenti normativi (CAP, IVASS, GDPR)
+5. Firma: Arturo Manzo — FIM Insurance Broker S.A.S.
+6. Footer: RUI B000405449 — Soggetto alla vigilanza IVASS
+Formatta in HTML professionale. NO markdown.`
+    }
+};
+
+let currentDocType = null;
+
+function openDocGen(type) {
+    currentDocType = type;
+    const tpl = DOC_TEMPLATES[type];
+    if (!tpl) return;
+
+    document.getElementById('docGenTitle').textContent = tpl.title;
+    document.getElementById('docGenArea').style.display = 'block';
+    document.getElementById('docPreview').style.display = 'none';
+    document.getElementById('btnCopyDoc').style.display = 'none';
+    document.getElementById('btnPrintDoc').style.display = 'none';
+
+    // Build form
+    let html = '';
+    tpl.fields.forEach(f => {
+        html += `<div class="form-group">`;
+        html += `<label>${f.label}${f.required ? ' *' : ''}</label>`;
+
+        if (f.type === 'select_cliente') {
+            html += `<select class="form-control" id="${f.id}"><option value="">— Seleziona cliente —</option>`;
+            (cache.clienti || []).forEach(c => {
+                const nome = c.tipo === 'azienda' ? c.ragione_sociale : `${c.cognome} ${c.nome}`;
+                html += `<option value="${c.id}" data-json='${JSON.stringify(c).replace(/'/g,"&#39;")}'>${nome} ${c.codice_fiscale ? '('+c.codice_fiscale+')' : ''}</option>`;
+            });
+            html += `</select>`;
+        } else if (f.type === 'select_polizza') {
+            html += `<select class="form-control" id="${f.id}"><option value="">— Seleziona polizza —</option>`;
+            (cache.polizze || []).forEach(p => {
+                const cl = clienteName(p.clienti);
+                html += `<option value="${p.id}" data-json='${JSON.stringify({...p, _clienteName: cl}).replace(/'/g,"&#39;")}'>${p.numero_polizza} — ${cl} — ${p.compagnie?.nome || ''}</option>`;
+            });
+            html += `</select>`;
+        } else if (f.type === 'select_collab') {
+            html += `<select class="form-control" id="${f.id}"><option value="">— Seleziona collaboratore —</option>`;
+            (cache.collaboratori || []).forEach(c => {
+                html += `<option value="${c.id}" data-json='${JSON.stringify(c).replace(/'/g,"&#39;")}'>${c.nome} ${c.cognome} (${c.codice})</option>`;
+            });
+            html += `</select>`;
+        } else if (f.type === 'select') {
+            html += `<select class="form-control" id="${f.id}">`;
+            f.options.forEach(o => html += `<option value="${o}">${o}</option>`);
+            html += `</select>`;
+        } else if (f.type === 'textarea') {
+            html += `<textarea class="form-control" id="${f.id}" rows="3" placeholder="${f.placeholder || ''}">${f.default || ''}</textarea>`;
+        } else {
+            html += `<input type="${f.type || 'text'}" class="form-control" id="${f.id}" placeholder="${f.placeholder || ''}">`;
+        }
+        html += `</div>`;
+    });
+
+    document.getElementById('docGenForm').innerHTML = html;
+
+    // Scroll to area
+    document.getElementById('docGenArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeDocGen() {
+    document.getElementById('docGenArea').style.display = 'none';
+    currentDocType = null;
+}
+
+async function generateDocument() {
+    if (!currentDocType) return;
+    const tpl = DOC_TEMPLATES[currentDocType];
+    const btn = document.getElementById('btnGenerate');
+    btn.disabled = true;
+    btn.textContent = '⏳ FIMA sta generando...';
+
+    // Collect form data
+    const formData = {};
+    tpl.fields.forEach(f => {
+        const el = document.getElementById(f.id);
+        if (!el) return;
+        formData[f.label] = el.value;
+
+        // Get JSON data from selected option
+        if (f.type.startsWith('select_') && el.selectedOptions[0]) {
+            const jsonStr = el.selectedOptions[0].getAttribute('data-json');
+            if (jsonStr) {
+                try { formData[f.label + '_data'] = JSON.parse(jsonStr.replace(/&#39;/g, "'")); } catch(e) {}
+            }
+        }
+    });
+
+    // Build context with real data from Supabase
+    let context = `DATA ODIERNA: ${new Date().toLocaleDateString('it-IT')}\n\n`;
+    context += `DATI COMPILATI DALL'UTENTE:\n`;
+    Object.entries(formData).forEach(([k, v]) => {
+        if (!k.endsWith('_data') && v) context += `- ${k}: ${v}\n`;
+    });
+
+    // Add entity details
+    Object.entries(formData).forEach(([k, v]) => {
+        if (k.endsWith('_data') && v) {
+            context += `\nDETTAGLI ${k.replace('_data','').toUpperCase()}:\n`;
+            Object.entries(v).forEach(([field, val]) => {
+                if (val && field !== 'id' && !field.startsWith('_')) {
+                    context += `  ${field}: ${typeof val === 'object' ? JSON.stringify(val) : val}\n`;
+                }
+            });
+        }
+    });
+
+    // Add polizze of collaborator for estratto conto
+    if (currentDocType === 'estratto') {
+        const collabId = document.getElementById('doc_collab')?.value;
+        if (collabId) {
+            const collabPolizze = cache.polizze.filter(p => p.collaboratore_id == collabId && p.stato === 'attiva');
+            context += `\nPOLIZZE DEL COLLABORATORE (${collabPolizze.length}):\n`;
+            collabPolizze.forEach(p => {
+                context += `  - N. ${p.numero_polizza} | ${clienteName(p.clienti)} | ${p.compagnie?.nome} | ${p.rami_assicurativi?.nome} | Premio: EUR ${p.premio_lordo} | Imponibile: EUR ${p.imponibile || (p.premio_lordo - (p.imposte||0) - (p.ssn||0)).toFixed(2)}\n`;
+            });
+        }
+    }
+
+    try {
+        const apiUrl = localStorage.getItem('fim_ai_proxy') || 'https://fim-gestionale-v2.vercel.app/api/claude';
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 4000,
+                system: tpl.systemPrompt,
+                messages: [
+                    { role: 'user', content: `Genera il documento con questi dati:\n\n${context}` }
+                ]
+            })
+        });
+
+        if (!response.ok) throw new Error('API non disponibile');
+        const data = await response.json();
+        const docHtml = data.content?.[0]?.text || 'Errore nella generazione';
+
+        // Show preview
+        document.getElementById('docContent').innerHTML = docHtml;
+        document.getElementById('docPreview').style.display = 'block';
+        document.getElementById('btnCopyDoc').style.display = 'inline-block';
+        document.getElementById('btnPrintDoc').style.display = 'inline-block';
+        document.getElementById('docGenStatus').textContent = `Generato il ${new Date().toLocaleString('it-IT')}`;
+
+        document.getElementById('docPreview').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch(e) {
+        alert('Errore generazione: ' + e.message + '\nVerifica che il proxy FIMA sia attivo.');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🤖 Genera con FIMA';
+}
+
+function copyDocToClipboard() {
+    const content = document.getElementById('docContent');
+    // Copy as formatted text
+    const range = document.createRange();
+    range.selectNodeContents(content);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand('copy');
+    sel.removeAllRanges();
+
+    const btn = document.getElementById('btnCopyDoc');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copiato!';
+    setTimeout(() => btn.textContent = orig, 2000);
+}
+
+function printDoc() {
+    const content = document.getElementById('docContent').innerHTML;
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><title>FIM Documento</title>
+<style>
+body{font-family:'Times New Roman',serif;font-size:13pt;line-height:1.6;padding:40px 60px;color:#000;max-width:210mm;margin:0 auto}
+h1,h2,h3{color:#1a3a5c;font-family:Arial,sans-serif}
+h1{font-size:16pt;border-bottom:2px solid #00c4b4;padding-bottom:8px}
+h2{font-size:14pt;margin-top:20px}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;font-size:11pt}
+th{background:#1a3a5c;color:#fff}
+.firma{margin-top:40px;border-top:1px solid #999;padding-top:8px;width:250px}
+@media print{body{padding:20px}}
+</style></head><body>${content}</body></html>`);
+    w.document.close();
+    w.print();
 }
 </script>
 
