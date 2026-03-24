@@ -3725,36 +3725,78 @@ async function savePDFExtraction() {
 
         // Create new client if needed
         if (!clienteId) {
-            var cf = document.getElementById('pdf_cf').value.trim();
+            var cf = document.getElementById('pdf_cf').value.trim().toUpperCase();
             var piva = document.getElementById('pdf_piva').value.trim();
-            var nameParts = nominativo.split(/\s+/);
-            var cognome = nameParts[0] || '';
-            var nome = nameParts.slice(1).join(' ') || '';
 
-            var newCliente = {
-                cognome: cognome,
-                nome: nome,
-                codice_fiscale: cf || null,
-                partita_iva: piva || null,
-                tipo: piva ? 'azienda' : 'privato',
-                telefono: document.getElementById('pdf_telefono').value || null,
-                email: document.getElementById('pdf_email').value || null,
-                indirizzo: document.getElementById('pdf_indirizzo').value || null
-            };
-
-            // If it looks like a company (S.R.L., S.P.A., etc.)
-            if (/S\.?R\.?L|S\.?P\.?A|S\.?N\.?C|S\.?A\.?S|S\.?R\.?L\.?S/i.test(nominativo)) {
-                newCliente.ragione_sociale = nominativo;
-                newCliente.tipo = 'azienda';
-                newCliente.cognome = null;
-                newCliente.nome = null;
+            // First: try to find existing client by CF or PIVA in Supabase (more reliable than cache)
+            if (cf || piva) {
+                var lookupQuery = null;
+                if (cf && cf.length === 16) {
+                    lookupQuery = sbClient.from('clienti').select('id').eq('codice_fiscale', cf).is('eliminato_il', null).limit(1);
+                } else if (cf && cf.length === 11) {
+                    // It's a PIVA stored in cf field
+                    lookupQuery = sbClient.from('clienti').select('id').eq('partita_iva', cf).is('eliminato_il', null).limit(1);
+                    if (!piva) piva = cf;
+                    cf = '';
+                } else if (piva) {
+                    lookupQuery = sbClient.from('clienti').select('id').eq('partita_iva', piva).is('eliminato_il', null).limit(1);
+                }
+                if (lookupQuery) {
+                    var { data: existingCli } = await lookupQuery;
+                    if (existingCli && existingCli.length > 0) {
+                        clienteId = existingCli[0].id;
+                        toast('🔗 Cliente esistente trovato via CF/PIVA (ID: ' + clienteId + ')', 'success');
+                    }
+                }
             }
 
-            var { data: inserted, error: insErr } = await sbClient.from('clienti').insert(newCliente).select().single();
-            if (insErr) throw new Error('Errore creazione cliente: ' + insErr.message);
-            clienteId = inserted.id;
-            toast('🆕 Nuovo cliente creato: ' + nominativo, 'success');
-            await loadClienti(); // Refresh cache
+            // If still no match, create new client
+            if (!clienteId) {
+                var nameParts = nominativo.split(/\s+/);
+                var cognome = nameParts[0] || '';
+                var nome = nameParts.slice(1).join(' ') || '';
+
+                var newCliente = {
+                    cognome: cognome,
+                    nome: nome,
+                    codice_fiscale: (cf && cf.length === 16) ? cf : null,
+                    partita_iva: piva || null,
+                    tipo: piva ? 'azienda' : 'privato',
+                    telefono: document.getElementById('pdf_telefono').value || null,
+                    email: document.getElementById('pdf_email').value || null,
+                    indirizzo: document.getElementById('pdf_indirizzo').value || null
+                };
+
+                // If it looks like a company (S.R.L., S.P.A., etc.)
+                if (/S\.?R\.?L|S\.?P\.?A|S\.?N\.?C|S\.?A\.?S|S\.?R\.?L\.?S/i.test(nominativo)) {
+                    newCliente.ragione_sociale = nominativo;
+                    newCliente.tipo = 'azienda';
+                    newCliente.cognome = null;
+                    newCliente.nome = null;
+                }
+
+                var { data: inserted, error: insErr } = await sbClient.from('clienti').insert(newCliente).select().single();
+                if (insErr) {
+                    // Handle duplicate CF/PIVA — look up existing
+                    if (insErr.message && insErr.message.includes('unique')) {
+                        var { data: dupCli } = await sbClient.from('clienti').select('id')
+                            .or('codice_fiscale.eq.' + (newCliente.codice_fiscale || '___'), 'partita_iva.eq.' + (newCliente.partita_iva || '___'))
+                            .is('eliminato_il', null).limit(1);
+                        if (dupCli && dupCli.length > 0) {
+                            clienteId = dupCli[0].id;
+                            toast('🔗 Cliente già esistente nel DB (ID: ' + clienteId + ')', 'success');
+                        } else {
+                            throw new Error('CF/PIVA duplicato ma cliente non trovato — verifica manualmente');
+                        }
+                    } else {
+                        throw new Error('Errore creazione cliente: ' + insErr.message);
+                    }
+                } else {
+                    clienteId = inserted.id;
+                    toast('🆕 Nuovo cliente creato: ' + nominativo, 'success');
+                }
+                await loadClienti(); // Refresh cache
+            }
         }
 
         // Match compagnia
