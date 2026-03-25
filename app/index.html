@@ -804,6 +804,9 @@
             <a onclick="navigateTo('provvigioni')" data-page="provvigioni">
                 <span class="nav-icon">&#x1F4B0;</span> Provvigioni
             </a>
+            <a onclick="navigateTo('fatture')" data-page="fatture">
+                <span class="nav-icon">&#x1F9FE;</span> Fatture
+            </a>
             <a onclick="navigateTo('collaboratori')" data-page="collaboratori">
                 <span class="nav-icon">&#x1F464;</span> Collaboratori
             </a>
@@ -1118,6 +1121,83 @@
                             </tr>
                         </thead>
                         <tbody id="provvigioniBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ======== FATTURE ======== -->
+            <div id="page-fatture" class="page">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <h1 class="page-title">Gestione Fatture</h1>
+                        <p class="page-subtitle">Fatture attive e passive</p>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-primary" onclick="openFatturaForm()">+ Nuova Fattura</button>
+                        <button class="btn btn-secondary" onclick="exportFattureCSV()">📥 Export CSV</button>
+                    </div>
+                </div>
+
+                <!-- KPI -->
+                <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="fatTotEmesse">-</div>
+                        <div class="kpi-label">Fatture Emesse</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="fatTotImponibile">-</div>
+                        <div class="kpi-label">Imponibile</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="fatTotIva">-</div>
+                        <div class="kpi-label">IVA</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="fatTotTotale">-</div>
+                        <div class="kpi-label">Totale</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="fatDaPagare" style="color:#EF4444">-</div>
+                        <div class="kpi-label">Da Incassare</div>
+                    </div>
+                </div>
+
+                <!-- Filtri -->
+                <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+                    <input type="text" class="form-control" id="searchFatture" placeholder="Cerca fattura..." oninput="filterFattureList()" style="flex:1;min-width:200px;">
+                    <select class="form-control" id="filterStatoFattura" onchange="filterFattureList()" style="width:auto">
+                        <option value="">Tutti gli stati</option>
+                        <option value="bozza">Bozza</option>
+                        <option value="emessa">Emessa</option>
+                        <option value="inviata">Inviata</option>
+                        <option value="pagata">Pagata</option>
+                        <option value="scaduta">Scaduta</option>
+                        <option value="annullata">Annullata</option>
+                    </select>
+                    <select class="form-control" id="filterTipoFattura" onchange="filterFattureList()" style="width:auto">
+                        <option value="">Attive + Passive</option>
+                        <option value="attiva">Solo Attive</option>
+                        <option value="passiva">Solo Passive</option>
+                    </select>
+                </div>
+
+                <!-- Tabella Fatture -->
+                <div class="card" style="overflow-x:auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>N. Fattura</th>
+                                <th>Data</th>
+                                <th>Cliente</th>
+                                <th>Descrizione</th>
+                                <th>Imponibile</th>
+                                <th>IVA</th>
+                                <th>Totale</th>
+                                <th>Stato</th>
+                                <th>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fattureBody"></tbody>
                     </table>
                 </div>
             </div>
@@ -1801,8 +1881,9 @@ function navigateTo(page) {
     // Close sidebar on mobile
     document.getElementById('sidebar').classList.remove('open');
 
-    // Init provvigioni when navigating to that page
+    // Init sections when navigating to them
     if (page === 'provvigioni') initProvvigioni();
+    if (page === 'fatture') initFatture();
 }
 
 function toggleSidebar() {
@@ -3054,6 +3135,393 @@ function exportCSV(type) {
 
 function showDbStats() {
     toast('DB: ' + cache.clienti.length + ' clienti, ' + cache.polizze.length + ' polizze, ' + cache.sinistri.length + ' sinistri, ' + cache.collaboratori.length + ' collaboratori', 'info');
+}
+
+// ============================================================
+// GESTIONE FATTURE
+// ============================================================
+
+var fattureData = JSON.parse(localStorage.getItem('fim_fatture') || '[]');
+var fattureUseSupabase = false;
+
+async function initFatture() {
+    // Try Supabase first, fallback to localStorage
+    if (sbClient) {
+        try {
+            var { data, error } = await sbClient.from('fatture')
+                .select('*, clienti(cognome, nome, ragione_sociale)')
+                .is('eliminato_il', null)
+                .order('data_fattura', { ascending: false });
+            if (!error && data) {
+                fattureData = data;
+                fattureUseSupabase = true;
+            }
+        } catch(e) { /* fallback to localStorage */ }
+    }
+    renderFatture();
+}
+
+function renderFatture() {
+    var body = document.getElementById('fattureBody');
+    if (!body) return;
+    var list = fattureData;
+
+    // KPI
+    var emesse = list.filter(function(f) { return f.stato !== 'annullata' && f.stato !== 'bozza'; });
+    var totImp = emesse.reduce(function(s, f) { return s + (parseFloat(f.imponibile) || 0); }, 0);
+    var totIva = emesse.reduce(function(s, f) { return s + (parseFloat(f.iva_importo) || 0); }, 0);
+    var totTot = emesse.reduce(function(s, f) { return s + (parseFloat(f.totale) || 0); }, 0);
+    var daPagare = list.filter(function(f) { return f.stato === 'emessa' || f.stato === 'inviata' || f.stato === 'scaduta'; })
+        .reduce(function(s, f) { return s + (parseFloat(f.totale) || 0); }, 0);
+
+    document.getElementById('fatTotEmesse').textContent = emesse.length;
+    document.getElementById('fatTotImponibile').textContent = formatCurrency(totImp);
+    document.getElementById('fatTotIva').textContent = formatCurrency(totIva);
+    document.getElementById('fatTotTotale').textContent = formatCurrency(totTot);
+    document.getElementById('fatDaPagare').textContent = formatCurrency(daPagare);
+
+    var sb = { 'bozza': 'badge-default', 'emessa': 'badge-info', 'inviata': 'badge-warning', 'pagata': 'badge-success', 'scaduta': 'badge-danger', 'annullata': 'badge-default' };
+
+    body.innerHTML = list.length === 0 ?
+        '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--fim-text-light)"><h3>Nessuna fattura</h3><p>Clicca "Nuova Fattura" per iniziare</p></td></tr>' :
+        list.map(function(f, idx) {
+            var cliName = '';
+            if (f.clienti) cliName = clienteName(f.clienti);
+            else if (f.cliente_nome) cliName = f.cliente_nome;
+            else if (f.cliente_id) {
+                var cli = cache.clienti.find(function(c) { return c.id === f.cliente_id; });
+                cliName = cli ? clienteName(cli) : '-';
+            }
+            return '<tr>' +
+                '<td><strong>' + esc(f.numero_fattura || '-') + '</strong>' +
+                '<br><span class="badge ' + (f.tipo === 'passiva' ? 'badge-warning' : 'badge-info') + '" style="font-size:9px">' + (f.tipo === 'passiva' ? 'PASSIVA' : 'ATTIVA') + '</span></td>' +
+                '<td>' + formatDate(f.data_fattura) + '</td>' +
+                '<td>' + esc(cliName || '-') + '</td>' +
+                '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(f.descrizione || '-') + '</td>' +
+                '<td>' + formatCurrency(f.imponibile) + '</td>' +
+                '<td>' + formatCurrency(f.iva_importo) + ' <span style="font-size:10px;color:var(--fim-text-light)">(' + (f.iva_perc || 22) + '%)</span></td>' +
+                '<td><strong>' + formatCurrency(f.totale) + '</strong></td>' +
+                '<td><span class="badge ' + (sb[f.stato] || 'badge-default') + '">' + esc(f.stato || '-') + '</span></td>' +
+                '<td style="white-space:nowrap;">' +
+                '<button class="btn btn-secondary btn-sm" onclick="viewFattura(' + idx + ')" title="Dettaglio">👁</button> ' +
+                '<button class="btn btn-secondary btn-sm" onclick="downloadFatturaPDF(' + idx + ')" title="PDF">📥</button> ' +
+                '<button class="btn btn-secondary btn-sm" onclick="editFatturaStato(' + idx + ')" title="Stato">✏️</button>' +
+                '</td></tr>';
+        }).join('');
+}
+
+function filterFattureList() {
+    var q = (document.getElementById('searchFatture').value || '').toLowerCase();
+    var stato = document.getElementById('filterStatoFattura').value;
+    var tipo = document.getElementById('filterTipoFattura').value;
+    var rows = document.querySelectorAll('#fattureBody tr');
+    rows.forEach(function(r) {
+        var text = r.textContent.toLowerCase();
+        var matchQ = !q || text.includes(q);
+        var matchS = !stato || text.includes(stato);
+        var matchT = !tipo || text.includes(tipo);
+        r.style.display = (matchQ && matchS && matchT) ? '' : 'none';
+    });
+}
+
+function getNextFatturaNum() {
+    var year = new Date().getFullYear();
+    var existing = fattureData.filter(function(f) { return (f.numero_fattura || '').includes('/' + year); });
+    var maxNum = 0;
+    existing.forEach(function(f) {
+        var parts = (f.numero_fattura || '').split('/');
+        var n = parseInt(parts[0]) || 0;
+        if (n > maxNum) maxNum = n;
+    });
+    return String(maxNum + 1).padStart(3, '0') + '/' + year;
+}
+
+function openFatturaForm(editIdx) {
+    var isEdit = editIdx !== undefined && fattureData[editIdx];
+    var f = isEdit ? fattureData[editIdx] : {};
+    var nextNum = isEdit ? f.numero_fattura : getNextFatturaNum();
+
+    var cliOptions = '<option value="">— Seleziona cliente —</option>' +
+        cache.clienti.map(function(c) {
+            var sel = (f.cliente_id && c.id === f.cliente_id) ? ' selected' : '';
+            return '<option value="' + c.id + '"' + sel + '>' + esc(clienteName(c)) + '</option>';
+        }).join('');
+
+    var modal = document.createElement('div');
+    modal.id = 'modalFattura';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+    modal.innerHTML = '<div style="background:var(--fim-card);border-radius:12px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;padding:24px;">' +
+        '<h3 style="color:var(--fim-navy);margin-bottom:16px;">' + (isEdit ? 'Modifica Fattura' : 'Nuova Fattura') + '</h3>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+        '<div class="form-group"><label>N. Fattura</label><input type="text" class="form-control" id="fat_numero" value="' + esc(nextNum) + '"></div>' +
+        '<div class="form-group"><label>Data Fattura</label><input type="date" class="form-control" id="fat_data" value="' + (f.data_fattura || new Date().toISOString().slice(0, 10)) + '"></div>' +
+        '<div class="form-group"><label>Tipo</label><select class="form-control" id="fat_tipo"><option value="attiva"' + (f.tipo === 'attiva' || !f.tipo ? ' selected' : '') + '>Attiva (emessa)</option><option value="passiva"' + (f.tipo === 'passiva' ? ' selected' : '') + '>Passiva (ricevuta)</option></select></div>' +
+        '<div class="form-group"><label>Cliente</label><select class="form-control" id="fat_cliente">' + cliOptions + '</select></div>' +
+        '<div class="form-group" style="grid-column:span 2"><label>Descrizione</label><input type="text" class="form-control" id="fat_desc" value="' + esc(f.descrizione || '') + '" placeholder="Consulenza assicurativa, intermediazione..."></div>' +
+        '<div class="form-group"><label>Imponibile (EUR)</label><input type="number" step="0.01" class="form-control" id="fat_imponibile" value="' + (f.imponibile || '') + '" oninput="calcFatturaTotali()"></div>' +
+        '<div class="form-group"><label>Aliquota IVA %</label><select class="form-control" id="fat_iva_perc" onchange="calcFatturaTotali()"><option value="22"' + ((f.iva_perc || 22) == 22 ? ' selected' : '') + '>22%</option><option value="10"' + (f.iva_perc == 10 ? ' selected' : '') + '>10%</option><option value="4"' + (f.iva_perc == 4 ? ' selected' : '') + '>4%</option><option value="0"' + (f.iva_perc == 0 ? ' selected' : '') + '>Esente (0%)</option></select></div>' +
+        '<div class="form-group"><label>IVA (EUR)</label><input type="number" step="0.01" class="form-control" id="fat_iva_importo" value="' + (f.iva_importo || '') + '" readonly style="background:#f0f0f0"></div>' +
+        '<div class="form-group"><label>Totale (EUR)</label><input type="number" step="0.01" class="form-control" id="fat_totale" value="' + (f.totale || '') + '" readonly style="background:#f0f0f0;font-weight:bold;font-size:16px"></div>' +
+        '<div class="form-group"><label>Scadenza Pagamento</label><input type="date" class="form-control" id="fat_scadenza" value="' + (f.data_scadenza || '') + '"></div>' +
+        '<div class="form-group"><label>Metodo Pagamento</label><select class="form-control" id="fat_metodo"><option value="">—</option><option value="Bonifico"' + (f.metodo_pagamento === 'Bonifico' ? ' selected' : '') + '>Bonifico</option><option value="Assegno"' + (f.metodo_pagamento === 'Assegno' ? ' selected' : '') + '>Assegno</option><option value="Contanti"' + (f.metodo_pagamento === 'Contanti' ? ' selected' : '') + '>Contanti</option><option value="Carta"' + (f.metodo_pagamento === 'Carta' ? ' selected' : '') + '>Carta</option><option value="RID"' + (f.metodo_pagamento === 'RID' ? ' selected' : '') + '>RID</option></select></div>' +
+        '<div class="form-group"><label>Stato</label><select class="form-control" id="fat_stato"><option value="bozza"' + (f.stato === 'bozza' ? ' selected' : '') + '>Bozza</option><option value="emessa"' + (f.stato === 'emessa' || !f.stato ? ' selected' : '') + '>Emessa</option><option value="inviata"' + (f.stato === 'inviata' ? ' selected' : '') + '>Inviata</option><option value="pagata"' + (f.stato === 'pagata' ? ' selected' : '') + '>Pagata</option><option value="annullata"' + (f.stato === 'annullata' ? ' selected' : '') + '>Annullata</option></select></div>' +
+        '<div class="form-group" style="grid-column:span 2"><label>Note</label><textarea class="form-control" id="fat_note" rows="2">' + esc(f.note || '') + '</textarea></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'modalFattura\').remove()">Annulla</button>' +
+        '<button class="btn btn-primary" onclick="saveFattura(' + (isEdit ? editIdx : -1) + ')">💾 Salva Fattura</button>' +
+        '</div></div>';
+    document.body.appendChild(modal);
+    calcFatturaTotali();
+}
+
+function calcFatturaTotali() {
+    var imp = parseFloat(document.getElementById('fat_imponibile').value) || 0;
+    var perc = parseFloat(document.getElementById('fat_iva_perc').value) || 0;
+    var iva = Math.round(imp * perc / 100 * 100) / 100;
+    document.getElementById('fat_iva_importo').value = iva.toFixed(2);
+    document.getElementById('fat_totale').value = (imp + iva).toFixed(2);
+}
+
+async function saveFattura(editIdx) {
+    var obj = {
+        numero_fattura: document.getElementById('fat_numero').value.trim(),
+        data_fattura: document.getElementById('fat_data').value,
+        data_scadenza: document.getElementById('fat_scadenza').value || null,
+        cliente_id: parseInt(document.getElementById('fat_cliente').value) || null,
+        tipo: document.getElementById('fat_tipo').value,
+        descrizione: document.getElementById('fat_desc').value.trim(),
+        imponibile: parseFloat(document.getElementById('fat_imponibile').value) || 0,
+        iva_perc: parseFloat(document.getElementById('fat_iva_perc').value) || 22,
+        iva_importo: parseFloat(document.getElementById('fat_iva_importo').value) || 0,
+        totale: parseFloat(document.getElementById('fat_totale').value) || 0,
+        stato: document.getElementById('fat_stato').value,
+        metodo_pagamento: document.getElementById('fat_metodo').value || null,
+        note: document.getElementById('fat_note').value.trim() || null
+    };
+
+    if (!obj.numero_fattura) { toast('Inserire il numero fattura', 'error'); return; }
+    if (!obj.imponibile) { toast('Inserire l\'imponibile', 'error'); return; }
+
+    // Store cliente_nome for localStorage display
+    if (obj.cliente_id) {
+        var cli = cache.clienti.find(function(c) { return c.id === obj.cliente_id; });
+        if (cli) obj.cliente_nome = clienteName(cli);
+    }
+
+    if (fattureUseSupabase) {
+        try {
+            if (editIdx >= 0 && fattureData[editIdx] && fattureData[editIdx].id) {
+                var upd = Object.assign({}, obj); delete upd.cliente_nome;
+                upd.aggiornato_il = new Date().toISOString();
+                var { error } = await sbClient.from('fatture').update(upd).eq('id', fattureData[editIdx].id);
+                if (error) throw error;
+            } else {
+                var ins = Object.assign({}, obj); delete ins.cliente_nome;
+                var { error } = await sbClient.from('fatture').insert(ins);
+                if (error) throw error;
+            }
+            toast('Fattura salvata in Supabase', 'success');
+        } catch(e) {
+            toast('Errore Supabase: ' + e.message + ' — salvata in locale', 'error');
+            saveFatturaLocal(obj, editIdx);
+        }
+        await initFatture();
+    } else {
+        saveFatturaLocal(obj, editIdx);
+        renderFatture();
+    }
+    document.getElementById('modalFattura').remove();
+}
+
+function saveFatturaLocal(obj, editIdx) {
+    if (editIdx >= 0) {
+        fattureData[editIdx] = Object.assign(fattureData[editIdx] || {}, obj);
+    } else {
+        obj.id = Date.now();
+        obj.creato_il = new Date().toISOString();
+        fattureData.unshift(obj);
+    }
+    localStorage.setItem('fim_fatture', JSON.stringify(fattureData));
+    toast('Fattura salvata in locale', 'success');
+}
+
+function editFatturaStato(idx) {
+    var f = fattureData[idx];
+    if (!f) return;
+    var stati = ['bozza', 'emessa', 'inviata', 'pagata', 'scaduta', 'annullata'];
+    var nextStato = '';
+    if (f.stato === 'emessa') nextStato = 'inviata';
+    else if (f.stato === 'inviata') nextStato = 'pagata';
+    else nextStato = 'emessa';
+
+    var modal = document.createElement('div');
+    modal.id = 'modalFatturaStato';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = '<div style="background:var(--fim-card);border-radius:12px;padding:24px;max-width:350px;width:90%;">' +
+        '<h3 style="margin-bottom:12px;color:var(--fim-navy)">Aggiorna Stato</h3>' +
+        '<p style="font-size:13px;margin-bottom:12px;">Fattura: <strong>' + esc(f.numero_fattura) + '</strong> — Stato attuale: <strong>' + esc(f.stato) + '</strong></p>' +
+        '<select class="form-control" id="fatStatoNew" style="margin-bottom:16px">' +
+        stati.map(function(s) { return '<option value="' + s + '"' + (s === nextStato ? ' selected' : '') + '>' + s.charAt(0).toUpperCase() + s.slice(1) + '</option>'; }).join('') +
+        '</select>' +
+        '<div id="fatPagamentoGroup" style="display:none;margin-bottom:12px;"><label style="font-size:12px;">Data Pagamento</label><input type="date" class="form-control" id="fatDataPag" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'modalFatturaStato\').remove()">Annulla</button>' +
+        '<button class="btn btn-primary" onclick="confirmFatturaStato(' + idx + ')">Aggiorna</button>' +
+        '</div></div>';
+    document.body.appendChild(modal);
+    document.getElementById('fatStatoNew').onchange = function() {
+        document.getElementById('fatPagamentoGroup').style.display = this.value === 'pagata' ? 'block' : 'none';
+    };
+    document.getElementById('fatStatoNew').dispatchEvent(new Event('change'));
+}
+
+async function confirmFatturaStato(idx) {
+    var newStato = document.getElementById('fatStatoNew').value;
+    var dataPag = newStato === 'pagata' ? document.getElementById('fatDataPag').value : null;
+
+    fattureData[idx].stato = newStato;
+    if (dataPag) fattureData[idx].data_pagamento = dataPag;
+
+    if (fattureUseSupabase && fattureData[idx].id) {
+        try {
+            var upd = { stato: newStato, aggiornato_il: new Date().toISOString() };
+            if (dataPag) upd.data_pagamento = dataPag;
+            await sbClient.from('fatture').update(upd).eq('id', fattureData[idx].id);
+        } catch(e) { /* save locally as fallback */ }
+    }
+    localStorage.setItem('fim_fatture', JSON.stringify(fattureData));
+    document.getElementById('modalFatturaStato').remove();
+    renderFatture();
+    toast('Stato aggiornato: ' + newStato, 'success');
+}
+
+function viewFattura(idx) {
+    var f = fattureData[idx];
+    if (!f) return;
+    var cliName = f.cliente_nome || '';
+    if (!cliName && f.clienti) cliName = clienteName(f.clienti);
+    if (!cliName && f.cliente_id) {
+        var cli = cache.clienti.find(function(c) { return c.id === f.cliente_id; });
+        if (cli) cliName = clienteName(cli);
+    }
+    var sb = { 'bozza': 'badge-default', 'emessa': 'badge-info', 'inviata': 'badge-warning', 'pagata': 'badge-success', 'scaduta': 'badge-danger', 'annullata': 'badge-default' };
+
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">' +
+        '<div><strong>N. Fattura:</strong> ' + esc(f.numero_fattura) + '</div>' +
+        '<div><strong>Tipo:</strong> <span class="badge ' + (f.tipo === 'passiva' ? 'badge-warning' : 'badge-info') + '">' + (f.tipo === 'passiva' ? 'PASSIVA' : 'ATTIVA') + '</span></div>' +
+        '<div><strong>Data:</strong> ' + formatDate(f.data_fattura) + '</div>' +
+        '<div><strong>Scadenza:</strong> ' + formatDate(f.data_scadenza) + '</div>' +
+        '<div><strong>Cliente:</strong> ' + esc(cliName || '-') + '</div>' +
+        '<div><strong>Stato:</strong> <span class="badge ' + (sb[f.stato] || 'badge-default') + '">' + esc(f.stato) + '</span></div>' +
+        '<div><strong>Metodo:</strong> ' + esc(f.metodo_pagamento || '-') + '</div>' +
+        '<div><strong>Data Pagamento:</strong> ' + formatDate(f.data_pagamento) + '</div>' +
+        '<div style="grid-column:span 2"><strong>Descrizione:</strong> ' + esc(f.descrizione || '-') + '</div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px;">' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:14px;text-align:center;"><div style="font-size:11px;color:var(--fim-text-light);">Imponibile</div><div style="font-size:18px;font-weight:bold;">' + formatCurrency(f.imponibile) + '</div></div>' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:14px;text-align:center;"><div style="font-size:11px;color:var(--fim-text-light);">IVA (' + (f.iva_perc || 22) + '%)</div><div style="font-size:18px;font-weight:bold;">' + formatCurrency(f.iva_importo) + '</div></div>' +
+        '<div style="background:#f0fdf4;border-radius:8px;padding:14px;text-align:center;"><div style="font-size:11px;color:var(--fim-text-light);">Totale</div><div style="font-size:22px;font-weight:bold;color:var(--fim-accent);">' + formatCurrency(f.totale) + '</div></div>' +
+        '</div>';
+    if (f.note) html += '<div style="margin-top:12px;padding:10px;background:#fef9c3;border-radius:8px;font-size:12px;"><strong>Note:</strong> ' + esc(f.note) + '</div>';
+    html += '<div style="margin-top:16px;display:flex;gap:8px;">' +
+        '<button class="btn btn-primary btn-sm" onclick="closeDetailModal();downloadFatturaPDF(' + idx + ')">📥 Scarica PDF</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="closeDetailModal();openFatturaForm(' + idx + ')">✏️ Modifica</button>' +
+        '</div>';
+
+    openDetailModal('Fattura ' + f.numero_fattura, html);
+}
+
+async function downloadFatturaPDF(idx) {
+    var f = fattureData[idx];
+    if (!f) return;
+    var cliName = f.cliente_nome || '';
+    if (!cliName && f.clienti) cliName = clienteName(f.clienti);
+    if (!cliName && f.cliente_id) {
+        var cli = cache.clienti.find(function(c) { return c.id === f.cliente_id; });
+        if (cli) cliName = clienteName(cli);
+    }
+
+    toast('Generazione PDF fattura...', 'info');
+
+    var container = document.createElement('div');
+    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;';
+    container.innerHTML = '<div style="font-family:Times New Roman,Georgia,serif;font-size:12pt;line-height:1.5;padding:30px 40px;color:#000;">' +
+        // Header FIM
+        '<div style="text-align:center;margin-bottom:20px;padding-bottom:15px;border-bottom:3px solid #1A3A5C;">' +
+        '<div style="font-size:22pt;font-weight:bold;color:#1A3A5C;font-family:Arial,sans-serif;letter-spacing:2px;">FIM INSURANCE BROKER</div>' +
+        '<div style="font-size:9pt;color:#666;margin-top:4px;">S.A.S. di Manzo Arturo &amp; C. — P.IVA 02763520595</div>' +
+        '<div style="font-size:8pt;color:#888;">Via Appia Sud, 80 — 04012 Cisterna di Latina (LT) | RUI Sez. B N. B000405449</div>' +
+        '<div style="font-size:8pt;color:#888;">Tel. 06 96027888 | Email: info@fimbroker.it | PEC: fimbroker@pec.it</div>' +
+        '</div>' +
+        // Fattura header
+        '<div style="display:flex;justify-content:space-between;margin-bottom:20px;">' +
+        '<div><h2 style="color:#1A3A5C;font-family:Arial,sans-serif;margin:0;font-size:18pt;">FATTURA N. ' + esc(f.numero_fattura) + '</h2>' +
+        '<p style="margin:4px 0;font-size:10pt;">Data: ' + formatDate(f.data_fattura) + '</p>' +
+        (f.data_scadenza ? '<p style="margin:4px 0;font-size:10pt;">Scadenza pagamento: ' + formatDate(f.data_scadenza) + '</p>' : '') +
+        '</div>' +
+        '<div style="text-align:right;font-size:10pt;max-width:250px;">' +
+        '<strong>Spett.le</strong><br>' + esc(cliName || 'Cliente') +
+        '</div></div>' +
+        // Table
+        '<table style="width:100%;border-collapse:collapse;margin:20px 0;">' +
+        '<thead><tr style="background:#1A3A5C;color:#fff;">' +
+        '<th style="padding:8px 12px;text-align:left;font-size:10pt;">Descrizione</th>' +
+        '<th style="padding:8px 12px;text-align:right;font-size:10pt;width:120px;">Imponibile</th>' +
+        '</tr></thead><tbody>' +
+        '<tr><td style="padding:10px 12px;border-bottom:1px solid #eee;">' + esc(f.descrizione || 'Consulenza e intermediazione assicurativa') + '</td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:right;">€ ' + (parseFloat(f.imponibile) || 0).toFixed(2) + '</td></tr>' +
+        '</tbody></table>' +
+        // Totali
+        '<div style="display:flex;justify-content:flex-end;margin-top:10px;">' +
+        '<table style="width:250px;border-collapse:collapse;">' +
+        '<tr><td style="padding:4px 8px;font-size:10pt;">Imponibile</td><td style="padding:4px 8px;text-align:right;font-size:10pt;">€ ' + (parseFloat(f.imponibile) || 0).toFixed(2) + '</td></tr>' +
+        '<tr><td style="padding:4px 8px;font-size:10pt;">IVA ' + (f.iva_perc || 22) + '%</td><td style="padding:4px 8px;text-align:right;font-size:10pt;">€ ' + (parseFloat(f.iva_importo) || 0).toFixed(2) + '</td></tr>' +
+        '<tr style="border-top:2px solid #1A3A5C;"><td style="padding:8px;font-weight:bold;font-size:12pt;">TOTALE</td><td style="padding:8px;text-align:right;font-weight:bold;font-size:12pt;color:#1A3A5C;">€ ' + (parseFloat(f.totale) || 0).toFixed(2) + '</td></tr>' +
+        '</table></div>' +
+        // Pagamento
+        (f.metodo_pagamento ? '<p style="margin-top:20px;font-size:10pt;"><strong>Modalità di pagamento:</strong> ' + esc(f.metodo_pagamento) + '</p>' : '') +
+        (f.note ? '<p style="font-size:9pt;color:#666;margin-top:10px;"><em>Note: ' + esc(f.note) + '</em></p>' : '') +
+        // Footer
+        '<div style="margin-top:50px;padding-top:15px;border-top:1px solid #ccc;font-size:7pt;color:#999;text-align:center;">FIM Insurance Broker S.A.S. di Manzo Arturo &amp; C. — www.fimbroker.it</div>' +
+        '</div>';
+    document.body.appendChild(container);
+
+    try {
+        var fileName = 'Fattura_' + (f.numero_fattura || '').replace(/\//g, '-') + '.pdf';
+        await html2pdf().set({
+            margin: [10, 10, 15, 10],
+            filename: fileName,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(container.firstElementChild).save();
+        toast('PDF scaricato: ' + fileName, 'success');
+    } catch(e) {
+        toast('Errore PDF: ' + e.message, 'error');
+    }
+    document.body.removeChild(container);
+}
+
+function exportFattureCSV() {
+    if (fattureData.length === 0) { toast('Nessuna fattura da esportare', 'error'); return; }
+    var rows = [['N. Fattura', 'Data', 'Tipo', 'Cliente', 'Descrizione', 'Imponibile', 'IVA %', 'IVA EUR', 'Totale', 'Stato', 'Metodo Pagamento', 'Data Pagamento', 'Scadenza', 'Note']];
+    fattureData.forEach(function(f) {
+        var cliName = f.cliente_nome || '';
+        if (!cliName && f.cliente_id) {
+            var cli = cache.clienti.find(function(c) { return c.id === f.cliente_id; });
+            if (cli) cliName = clienteName(cli);
+        }
+        rows.push([f.numero_fattura || '', f.data_fattura || '', f.tipo || '', cliName, f.descrizione || '', f.imponibile || 0, f.iva_perc || 22, f.iva_importo || 0, f.totale || 0, f.stato || '', f.metodo_pagamento || '', f.data_pagamento || '', f.data_scadenza || '', f.note || '']);
+    });
+    var csv = '\uFEFF' + rows.map(function(r) { return r.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(';'); }).join('\n');
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'FIM_Fatture_' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    toast('Export fatture scaricato', 'success');
 }
 
 // ============================================================
