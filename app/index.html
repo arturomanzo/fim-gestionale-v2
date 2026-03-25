@@ -19,6 +19,8 @@
     <!-- jsPDF per export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <!-- html2pdf per generazione PDF documenti -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         /* ============================================================
@@ -1495,8 +1497,9 @@
 
                         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
                             <button class="btn btn-primary" onclick="generateDocument()" id="btnGenerate">🤖 Genera con FIMA</button>
+                            <button class="btn btn-primary" onclick="downloadDocPDF()" id="btnDownloadPDF" style="display:none">📥 Scarica PDF</button>
                             <button class="btn btn-secondary" onclick="copyDocToClipboard()" id="btnCopyDoc" style="display:none">📋 Copia</button>
-                            <button class="btn btn-secondary" onclick="printDoc()" id="btnPrintDoc" style="display:none">🖨️ Stampa / PDF</button>
+                            <button class="btn btn-secondary" onclick="printDoc()" id="btnPrintDoc" style="display:none">🖨️ Stampa</button>
                         </div>
                     </div>
 
@@ -3120,6 +3123,7 @@ async function generateDocument() {
         // Show preview
         document.getElementById('docContent').innerHTML = docHtml;
         document.getElementById('docPreview').style.display = 'block';
+        document.getElementById('btnDownloadPDF').style.display = 'inline-block';
         document.getElementById('btnCopyDoc').style.display = 'inline-block';
         document.getElementById('btnPrintDoc').style.display = 'inline-block';
         document.getElementById('docGenStatus').textContent = `Generato il ${new Date().toLocaleString('it-IT')}`;
@@ -3167,6 +3171,57 @@ th{background:#1a3a5c;color:#fff}
 </style></head><body>${content}</body></html>`);
     w.document.close();
     w.print();
+}
+
+async function downloadDocPDF() {
+    const btn = document.getElementById('btnDownloadPDF');
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Generazione PDF...';
+
+    try {
+        // Create a temporary container with proper A4 styling
+        const container = document.createElement('div');
+        container.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;';
+        container.innerHTML = `
+            <div style="font-family:'Times New Roman',Georgia,serif;font-size:13pt;line-height:1.6;padding:30px 40px;color:#000;">
+                <div style="text-align:center;margin-bottom:20px;padding-bottom:15px;border-bottom:3px solid #1A3A5C;">
+                    <div style="font-size:22pt;font-weight:bold;color:#1A3A5C;font-family:Arial,sans-serif;letter-spacing:2px;">FIM INSURANCE BROKER</div>
+                    <div style="font-size:9pt;color:#666;margin-top:4px;">S.A.S. di Manzo Arturo &amp; C. — RUI Sez. B N. B000405449</div>
+                    <div style="font-size:8pt;color:#888;">Via Appia Sud, 80 — 04012 Cisterna di Latina (LT) | info@fimbroker.it | www.fimbroker.it</div>
+                </div>
+                ${document.getElementById('docContent').innerHTML}
+                <div style="margin-top:40px;padding-top:15px;border-top:1px solid #ccc;font-size:8pt;color:#999;text-align:center;">
+                    FIM Insurance Broker S.A.S. — Documento generato il ${new Date().toLocaleDateString('it-IT')} — www.fimbroker.it
+                </div>
+            </div>`;
+        document.body.appendChild(container);
+
+        // Generate filename from document type
+        var docType = currentDocType || 'documento';
+        var fileName = 'FIM_' + docType.charAt(0).toUpperCase() + docType.slice(1) + '_' + new Date().toISOString().slice(0,10) + '.pdf';
+
+        // Use html2pdf to generate real PDF
+        var opt = {
+            margin: [10, 10, 15, 10],
+            filename: fileName,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        await html2pdf().set(opt).from(container.firstElementChild).save();
+
+        document.body.removeChild(container);
+        toast('PDF scaricato: ' + fileName, 'success');
+    } catch(e) {
+        console.error('[FIMA Documenti] PDF error:', e);
+        toast('Errore generazione PDF: ' + e.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = origText;
 }
 
 // ══════════════════════════════════════════════════════════════
