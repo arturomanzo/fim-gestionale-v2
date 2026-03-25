@@ -1827,6 +1827,7 @@ async function refreshAll() {
         ]);
         renderDashboard();
         renderScadenzario();
+        renderCompliance();
         initProvvigioni();
         toast('Dati aggiornati', 'success');
     } catch (err) {
@@ -2231,6 +2232,37 @@ function renderComunicazioni() {
     }).join('') || '<tr><td colspan="6"><div class="empty-state"><h3>Nessuna comunicazione</h3></div></td></tr>';
 }
 
+// === COMPLIANCE IDD ===
+function renderCompliance() {
+    var today = new Date();
+    var attive = cache.polizze.filter(function(p) { return p.stato === 'attiva'; });
+    var conformi = 0, mancanti = 0, nonFirmati = 0;
+    var rows = attive.map(function(p) {
+        var det = p.dettagli_ramo || {};
+        var hasIDD = det.idd_compilato || det.idd_firmato || false;
+        var hasFirma = det.idd_firmato || false;
+        var hasDIP = det.dip_consegnato || false;
+        var ggSenza = hasIDD ? 0 : Math.ceil((today - new Date(p.data_emissione || p.data_effetto)) / 86400000);
+        if (hasIDD) conformi++; else mancanti++;
+        if (!hasFirma) nonFirmati++;
+        var badge = hasIDD ? 'badge-success' : ggSenza > 30 ? 'badge-danger' : 'badge-warning';
+        return '<tr>' +
+            '<td><strong>' + esc(p.numero_polizza) + '</strong></td>' +
+            '<td>' + esc(clienteName(p.clienti)) + '</td>' +
+            '<td>' + esc(p.rami_assicurativi ? p.rami_assicurativi.nome : '-') + '</td>' +
+            '<td>' + formatDate(p.data_emissione || p.data_effetto) + '</td>' +
+            '<td>' + (hasIDD ? '<span class="badge badge-success">✅ Sì</span>' : '<span class="badge badge-danger">❌ No</span>') + '</td>' +
+            '<td>' + (hasFirma ? '<span class="badge badge-success">✅</span>' : '<span class="badge badge-warning">⚠️</span>') + '</td>' +
+            '<td>' + (hasDIP ? '✅' : '❌') + '</td>' +
+            '<td><span class="badge ' + badge + '">' + (hasIDD ? '-' : ggSenza + ' gg') + '</span></td>' +
+            '</tr>';
+    });
+    document.getElementById('iddConformi').textContent = conformi;
+    document.getElementById('iddMancanti').textContent = mancanti;
+    document.getElementById('iddNonFirmati').textContent = nonFirmati;
+    document.getElementById('complianceBody').innerHTML = rows.join('') || '<tr><td colspan="8"><div class="empty-state"><h3>Nessuna polizza attiva</h3></div></td></tr>';
+}
+
 // === FILTERS ===
 function filterClienti() {
     const q = document.getElementById('searchClienti').value.toLowerCase();
@@ -2403,8 +2435,284 @@ function showQuickActions() {
 
 // === REPORT GENERATION ===
 function generateReport(type) {
-    toast('Generazione report ' + type + '...', 'info');
-    // Implementazione completa disponibile con Supabase
+    if (!cache.polizze || cache.polizze.length === 0) { toast('Nessun dato disponibile', 'error'); return; }
+    var today = new Date();
+    var dateStr = today.toLocaleDateString('it-IT');
+    var attive = cache.polizze.filter(function(p) { return p.stato === 'attiva'; });
+
+    // Build HTML for report
+    var html = '';
+    var title = '';
+
+    if (type === 'portafoglio') {
+        title = 'Report Portafoglio';
+        // Group by ramo
+        var byRamo = {};
+        attive.forEach(function(p) {
+            var r = p.rami_assicurativi ? p.rami_assicurativi.nome : 'Altro';
+            if (!byRamo[r]) byRamo[r] = [];
+            byRamo[r].push(p);
+        });
+        var totPremi = attive.reduce(function(s, p) { return s + (p.premio_lordo || 0); }, 0);
+        html = '<h2 style="color:#1A3A5C;font-family:Arial,sans-serif;">Report Portafoglio Polizze Attive</h2>';
+        html += '<p>Data: ' + dateStr + ' | Polizze attive: <strong>' + attive.length + '</strong> | Premi totali: <strong>' + formatCurrency(totPremi) + '</strong></p>';
+        Object.keys(byRamo).sort().forEach(function(ramo) {
+            var polRamo = byRamo[ramo];
+            var totRamo = polRamo.reduce(function(s, p) { return s + (p.premio_lordo || 0); }, 0);
+            html += '<h3 style="color:#00C4B4;margin-top:20px;">' + esc(ramo) + ' (' + polRamo.length + ' polizze — ' + formatCurrency(totRamo) + ')</h3>';
+            html += '<table><thead><tr><th>N. Polizza</th><th>Cliente</th><th>Compagnia</th><th>Effetto</th><th>Scadenza</th><th>Premio</th></tr></thead><tbody>';
+            polRamo.forEach(function(p) {
+                html += '<tr><td>' + esc(p.numero_polizza) + '</td><td>' + esc(clienteName(p.clienti)) + '</td><td>' + esc(p.compagnie ? p.compagnie.nome : '-') + '</td><td>' + formatDate(p.data_effetto) + '</td><td>' + formatDate(p.data_scadenza) + '</td><td>' + formatCurrency(p.premio_lordo) + '</td></tr>';
+            });
+            html += '</tbody></table>';
+        });
+        // Summary by compagnia
+        html += '<h3 style="color:#1A3A5C;margin-top:30px;">Riepilogo per Compagnia</h3><table><thead><tr><th>Compagnia</th><th>N. Polizze</th><th>Premi</th><th>%</th></tr></thead><tbody>';
+        var byComp = {};
+        attive.forEach(function(p) { var c = p.compagnie ? p.compagnie.nome : 'Altra'; byComp[c] = (byComp[c] || 0) + (p.premio_lordo || 0); });
+        var byCompCount = {};
+        attive.forEach(function(p) { var c = p.compagnie ? p.compagnie.nome : 'Altra'; byCompCount[c] = (byCompCount[c] || 0) + 1; });
+        Object.entries(byComp).sort(function(a, b) { return b[1] - a[1]; }).forEach(function(e) {
+            html += '<tr><td><strong>' + esc(e[0]) + '</strong></td><td>' + byCompCount[e[0]] + '</td><td>' + formatCurrency(e[1]) + '</td><td>' + (totPremi ? (e[1] / totPremi * 100).toFixed(1) : 0) + '%</td></tr>';
+        });
+        html += '</tbody></table>';
+
+    } else if (type === 'provvigioni') {
+        title = 'Estratto Conto Provvigionale';
+        var polConProvv = cache.polizze.filter(function(p) { return p.collaboratore_id && p.stato === 'attiva'; });
+        var byCollab = {};
+        polConProvv.forEach(function(p) {
+            var cName = p.collaboratori ? (p.collaboratori.cognome + ' ' + p.collaboratori.nome).trim() : 'Diretto';
+            if (!byCollab[cName]) byCollab[cName] = [];
+            byCollab[cName].push(p);
+        });
+        html = '<h2 style="color:#1A3A5C;font-family:Arial,sans-serif;">Estratto Conto Provvigionale</h2>';
+        html += '<p>Data: ' + dateStr + '</p>';
+        var grandTotal = 0;
+        Object.keys(byCollab).sort().forEach(function(collab) {
+            var polC = byCollab[collab];
+            html += '<h3 style="color:#00C4B4;margin-top:20px;">Collaboratore: ' + esc(collab) + '</h3>';
+            html += '<table><thead><tr><th>Polizza</th><th>Cliente</th><th>Compagnia</th><th>Imponibile</th><th>%</th><th>Provvigione</th></tr></thead><tbody>';
+            var totC = 0;
+            polC.forEach(function(p) {
+                var imp = p.imponibile || p.premio_lordo || 0;
+                var perc = p.perc_provvigione || 0;
+                var provv = p.provvigione || (imp * perc / 100);
+                totC += provv;
+                html += '<tr><td>' + esc(p.numero_polizza) + '</td><td>' + esc(clienteName(p.clienti)) + '</td><td>' + esc(p.compagnie ? p.compagnie.nome : '-') + '</td><td>' + formatCurrency(imp) + '</td><td>' + perc + '%</td><td><strong>' + formatCurrency(provv) + '</strong></td></tr>';
+            });
+            html += '<tr style="background:#f0f0f0;font-weight:bold"><td colspan="5">Totale ' + esc(collab) + '</td><td>' + formatCurrency(totC) + '</td></tr>';
+            html += '</tbody></table>';
+            grandTotal += totC;
+        });
+        html += '<h3 style="margin-top:20px;color:#1A3A5C;">TOTALE GENERALE PROVVIGIONI: ' + formatCurrency(grandTotal) + '</h3>';
+
+    } else if (type === 'scadenze') {
+        title = 'Report Scadenze';
+        var prossime = cache.polizze.filter(function(p) {
+            if (p.stato !== 'attiva' && p.stato !== 'in_rinnovo') return false;
+            var diff = (new Date(p.data_scadenza) - today) / 86400000;
+            return diff >= -30 && diff <= 90;
+        }).sort(function(a, b) { return new Date(a.data_scadenza) - new Date(b.data_scadenza); });
+        html = '<h2 style="color:#1A3A5C;font-family:Arial,sans-serif;">Report Scadenze Polizze</h2>';
+        html += '<p>Data: ' + dateStr + ' | Periodo: da -30gg a +90gg | Polizze: <strong>' + prossime.length + '</strong></p>';
+        html += '<table><thead><tr><th>Semaforo</th><th>Scadenza</th><th>GG</th><th>N. Polizza</th><th>Cliente</th><th>Compagnia</th><th>Ramo</th><th>Premio</th></tr></thead><tbody>';
+        prossime.forEach(function(p) {
+            var gg = Math.ceil((new Date(p.data_scadenza) - today) / 86400000);
+            var colore = gg < 0 ? '#EF4444' : gg <= 7 ? '#F59E0B' : gg <= 30 ? '#3B82F6' : '#10B981';
+            var label = gg < 0 ? 'SCADUTA' : gg <= 7 ? 'URGENTE' : gg <= 30 ? 'PROSSIMA' : 'OK';
+            html += '<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + colore + '"></span> ' + label + '</td><td>' + formatDate(p.data_scadenza) + '</td><td>' + gg + '</td><td>' + esc(p.numero_polizza) + '</td><td>' + esc(clienteName(p.clienti)) + '</td><td>' + esc(p.compagnie ? p.compagnie.nome : '-') + '</td><td>' + esc(p.rami_assicurativi ? p.rami_assicurativi.nome : '-') + '</td><td>' + formatCurrency(p.premio_lordo) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+
+    } else if (type === 'compliance') {
+        title = 'Audit Compliance IDD';
+        html = '<h2 style="color:#1A3A5C;font-family:Arial,sans-serif;">Audit Compliance IDD — Reg. IVASS 40/2018</h2>';
+        html += '<p>Data: ' + dateStr + '</p>';
+        var conformi = 0, mancanti = 0, nonFirmati = 0;
+        html += '<table><thead><tr><th>Polizza</th><th>Cliente</th><th>Ramo</th><th>Emissione</th><th>IDD</th><th>DIP</th><th>GG senza IDD</th></tr></thead><tbody>';
+        attive.forEach(function(p) {
+            var det = p.dettagli_ramo || {};
+            var hasIDD = det.idd_compilato || det.idd_firmato || false;
+            var hasDIP = det.dip_consegnato || false;
+            var ggSenza = hasIDD ? 0 : Math.ceil((today - new Date(p.data_emissione || p.data_effetto)) / 86400000);
+            if (hasIDD) conformi++; else mancanti++;
+            if (!hasIDD && !det.idd_firmato) nonFirmati++;
+            var color = hasIDD ? '#10B981' : ggSenza > 30 ? '#EF4444' : '#F59E0B';
+            html += '<tr style="border-left:3px solid ' + color + '"><td>' + esc(p.numero_polizza) + '</td><td>' + esc(clienteName(p.clienti)) + '</td><td>' + esc(p.rami_assicurativi ? p.rami_assicurativi.nome : '-') + '</td><td>' + formatDate(p.data_emissione || p.data_effetto) + '</td><td>' + (hasIDD ? '✅' : '❌') + '</td><td>' + (hasDIP ? '✅' : '❌') + '</td><td>' + (hasIDD ? '-' : ggSenza) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        html += '<h3 style="margin-top:20px;">Riepilogo: ✅ Conformi: ' + conformi + ' | ❌ IDD Mancante: ' + mancanti + ' | Non Firmati: ' + nonFirmati + '</h3>';
+
+    } else if (type === 'ec_cliente') {
+        title = 'Estratto Conto Cliente';
+        // Show selection modal
+        showReportClienteSelector();
+        return;
+
+    } else if (type === 'sinistri') {
+        title = 'Report Sinistri';
+        html = '<h2 style="color:#1A3A5C;font-family:Arial,sans-serif;">Report Sinistri</h2>';
+        html += '<p>Data: ' + dateStr + ' | Sinistri totali: <strong>' + cache.sinistri.length + '</strong></p>';
+        var aperti = cache.sinistri.filter(function(s) { return s.stato === 'aperto' || s.stato === 'in_istruttoria'; });
+        var riserva = aperti.reduce(function(s, si) { return s + (si.riserva || 0); }, 0);
+        var premiTot = attive.reduce(function(s, p) { return s + (p.premio_lordo || 0); }, 0);
+        var lossRatio = premiTot > 0 ? (riserva / premiTot * 100).toFixed(1) : 0;
+        html += '<p>Aperti: <strong>' + aperti.length + '</strong> | Riserva totale: <strong>' + formatCurrency(riserva) + '</strong> | Loss Ratio stimato: <strong>' + lossRatio + '%</strong></p>';
+        html += '<table><thead><tr><th>N. Sinistro</th><th>Cliente</th><th>Polizza</th><th>Data Evento</th><th>Tipo</th><th>Riserva</th><th>Stato</th></tr></thead><tbody>';
+        cache.sinistri.forEach(function(s) {
+            var statCol = s.stato === 'aperto' ? '#EF4444' : s.stato === 'in_istruttoria' ? '#F59E0B' : s.stato === 'liquidato' ? '#10B981' : '#999';
+            html += '<tr><td><strong>' + esc(s.numero_sinistro || '-') + '</strong></td><td>' + esc(clienteName(s.clienti)) + '</td><td>' + esc(s.polizze ? s.polizze.numero_polizza : '-') + '</td><td>' + formatDate(s.data_evento) + '</td><td>' + esc(s.tipo_sinistro || '-') + '</td><td>' + formatCurrency(s.riserva) + '</td><td><span style="color:' + statCol + ';font-weight:bold">' + esc(s.stato || '-') + '</span></td></tr>';
+        });
+        html += '</tbody></table>';
+        // Loss ratio by ramo
+        var lrByRamo = {};
+        cache.sinistri.forEach(function(s) {
+            if (!s.polizza_id) return;
+            var pol = cache.polizze.find(function(p) { return p.id === s.polizza_id; });
+            var ramo = pol && pol.rami_assicurativi ? pol.rami_assicurativi.nome : 'Altro';
+            if (!lrByRamo[ramo]) lrByRamo[ramo] = { riserva: 0, premi: 0 };
+            lrByRamo[ramo].riserva += (s.riserva || 0);
+        });
+        attive.forEach(function(p) {
+            var ramo = p.rami_assicurativi ? p.rami_assicurativi.nome : 'Altro';
+            if (!lrByRamo[ramo]) lrByRamo[ramo] = { riserva: 0, premi: 0 };
+            lrByRamo[ramo].premi += (p.premio_lordo || 0);
+        });
+        html += '<h3 style="margin-top:20px;color:#1A3A5C;">Loss Ratio per Ramo</h3><table><thead><tr><th>Ramo</th><th>Riserva</th><th>Premi</th><th>Loss Ratio</th></tr></thead><tbody>';
+        Object.entries(lrByRamo).forEach(function(e) {
+            var lr = e[1].premi > 0 ? (e[1].riserva / e[1].premi * 100).toFixed(1) : 0;
+            html += '<tr><td>' + esc(e[0]) + '</td><td>' + formatCurrency(e[1].riserva) + '</td><td>' + formatCurrency(e[1].premi) + '</td><td><strong>' + lr + '%</strong></td></tr>';
+        });
+        html += '</tbody></table>';
+    }
+
+    if (html) openReportPreview(title, html);
+}
+
+function showReportClienteSelector() {
+    var options = cache.clienti.map(function(c) {
+        return '<option value="' + c.id + '">' + esc(clienteName(c)) + (c.codice_fiscale ? ' — ' + c.codice_fiscale : '') + '</option>';
+    }).join('');
+    var modal = document.createElement('div');
+    modal.id = 'modalReportCliente';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = '<div style="background:#fff;border-radius:12px;padding:24px;max-width:400px;width:90%;">' +
+        '<h3 style="margin-bottom:16px;color:var(--fim-navy)">Seleziona Cliente</h3>' +
+        '<select id="reportClienteSelect" class="form-control" style="margin-bottom:16px">' + options + '</select>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'modalReportCliente\').remove()">Annulla</button>' +
+        '<button class="btn btn-primary" onclick="generateReportCliente()">Genera Report</button>' +
+        '</div></div>';
+    document.body.appendChild(modal);
+}
+
+function generateReportCliente() {
+    var sel = document.getElementById('reportClienteSelect');
+    var cliId = parseInt(sel.value);
+    var cli = cache.clienti.find(function(c) { return c.id === cliId; });
+    document.getElementById('modalReportCliente').remove();
+    if (!cli) { toast('Cliente non trovato', 'error'); return; }
+
+    var cliPol = cache.polizze.filter(function(p) { return p.cliente_id === cliId; });
+    var cliSin = cache.sinistri.filter(function(s) { return s.cliente_id === cliId; });
+    var dateStr = new Date().toLocaleDateString('it-IT');
+
+    var html = '<h2 style="color:#1A3A5C;font-family:Arial,sans-serif;">Estratto Conto Cliente</h2>';
+    html += '<h3>' + esc(clienteName(cli)) + '</h3>';
+    html += '<p>CF/PIVA: <strong>' + esc(cli.codice_fiscale || cli.partita_iva || '-') + '</strong> | Email: ' + esc(cli.email || '-') + ' | Tel: ' + esc(cli.cellulare || cli.telefono || '-') + '</p>';
+    html += '<p>Indirizzo: ' + esc([cli.indirizzo, cli.cap, cli.citta, cli.provincia].filter(Boolean).join(', ') || '-') + '</p>';
+    html += '<p>Data: ' + dateStr + '</p>';
+
+    // Polizze
+    var totPremi = cliPol.reduce(function(s, p) { return s + (p.premio_lordo || 0); }, 0);
+    html += '<h3 style="color:#00C4B4;margin-top:20px;">Polizze (' + cliPol.length + ') — Premi totali: ' + formatCurrency(totPremi) + '</h3>';
+    html += '<table><thead><tr><th>N. Polizza</th><th>Compagnia</th><th>Ramo</th><th>Effetto</th><th>Scadenza</th><th>Premio</th><th>Stato</th></tr></thead><tbody>';
+    cliPol.forEach(function(p) {
+        html += '<tr><td>' + esc(p.numero_polizza) + '</td><td>' + esc(p.compagnie ? p.compagnie.nome : '-') + '</td><td>' + esc(p.rami_assicurativi ? p.rami_assicurativi.nome : '-') + '</td><td>' + formatDate(p.data_effetto) + '</td><td>' + formatDate(p.data_scadenza) + '</td><td>' + formatCurrency(p.premio_lordo) + '</td><td>' + esc(p.stato) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+
+    // Sinistri
+    if (cliSin.length > 0) {
+        html += '<h3 style="color:#EF4444;margin-top:20px;">Sinistri (' + cliSin.length + ')</h3>';
+        html += '<table><thead><tr><th>N. Sinistro</th><th>Data</th><th>Tipo</th><th>Riserva</th><th>Stato</th></tr></thead><tbody>';
+        cliSin.forEach(function(s) {
+            html += '<tr><td>' + esc(s.numero_sinistro || '-') + '</td><td>' + formatDate(s.data_evento) + '</td><td>' + esc(s.tipo_sinistro || '-') + '</td><td>' + formatCurrency(s.riserva) + '</td><td>' + esc(s.stato || '-') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+    }
+
+    openReportPreview('EC — ' + clienteName(cli), html);
+}
+
+function openReportPreview(title, bodyHtml) {
+    // Remove existing modal
+    var existing = document.getElementById('modalReport');
+    if (existing) existing.remove();
+
+    var modal = document.createElement('div');
+    modal.id = 'modalReport';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:900px;width:100%;max-height:90vh;display:flex;flex-direction:column;">' +
+        '<div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+        '<h3 style="color:var(--fim-navy);font-size:16px;">' + esc(title) + '</h3>' +
+        '<div style="display:flex;gap:8px;">' +
+        '<button class="btn btn-primary btn-sm" onclick="downloadReportPDF()">📥 Scarica PDF</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="printReportHTML()">🖨️ Stampa</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'modalReport\').remove()">✕</button>' +
+        '</div></div>' +
+        '<div id="reportPreviewContent" style="padding:20px;overflow-y:auto;font-family:Times New Roman,serif;font-size:13px;line-height:1.5;color:#000;">' + bodyHtml + '</div>' +
+        '</div>';
+    document.body.appendChild(modal);
+}
+
+async function downloadReportPDF() {
+    var content = document.getElementById('reportPreviewContent');
+    if (!content) return;
+    var btn = document.querySelector('#modalReport .btn-primary');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando...'; }
+
+    try {
+        var container = document.createElement('div');
+        container.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;';
+        container.innerHTML = '<div style="font-family:Times New Roman,Georgia,serif;font-size:12pt;line-height:1.5;padding:25px 35px;color:#000;">' +
+            '<div style="text-align:center;margin-bottom:15px;padding-bottom:12px;border-bottom:3px solid #1A3A5C;">' +
+            '<div style="font-size:20pt;font-weight:bold;color:#1A3A5C;font-family:Arial,sans-serif;letter-spacing:2px;">FIM INSURANCE BROKER</div>' +
+            '<div style="font-size:8pt;color:#666;margin-top:3px;">S.A.S. di Manzo Arturo &amp; C. — RUI Sez. B N. B000405449 — www.fimbroker.it</div>' +
+            '</div>' + content.innerHTML +
+            '<div style="margin-top:30px;padding-top:10px;border-top:1px solid #ccc;font-size:7pt;color:#999;text-align:center;">FIM Insurance Broker S.A.S. — ' + new Date().toLocaleDateString('it-IT') + '</div></div>';
+        document.body.appendChild(container);
+
+        await html2pdf().set({
+            margin: [8, 8, 12, 8],
+            filename: 'FIM_Report_' + new Date().toISOString().slice(0, 10) + '.pdf',
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        }).from(container.firstElementChild).save();
+
+        document.body.removeChild(container);
+        toast('Report PDF scaricato', 'success');
+    } catch(e) {
+        toast('Errore PDF: ' + e.message, 'error');
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '📥 Scarica PDF'; }
+}
+
+function printReportHTML() {
+    var content = document.getElementById('reportPreviewContent');
+    if (!content) return;
+    var w = window.open('', '_blank');
+    w.document.write('<!DOCTYPE html><html><head><title>FIM Report</title><style>' +
+        'body{font-family:Times New Roman,serif;font-size:12pt;padding:30px 50px;color:#000;max-width:210mm;margin:0 auto}' +
+        'h2,h3{color:#1a3a5c;font-family:Arial,sans-serif}h2{border-bottom:2px solid #00c4b4;padding-bottom:6px}' +
+        'table{width:100%;border-collapse:collapse;margin:10px 0;font-size:10pt}th,td{border:1px solid #ddd;padding:5px 8px;text-align:left}' +
+        'th{background:#1a3a5c;color:#fff;font-size:9pt}@media print{body{padding:15px}}' +
+        '</style></head><body>' + content.innerHTML + '</body></html>');
+    w.document.close();
+    w.print();
 }
 
 // === PROVVIGIONI ===
@@ -2514,13 +2822,238 @@ function exportProvvigioni() {
     toast('Export CSV provvigioni in sviluppo...', 'info');
 }
 
-// === PLACEHOLDER FUNCTIONS ===
-function viewCliente(id) { toast('Dettaglio cliente #' + id, 'info'); }
-function viewPolizza(id) { toast('Dettaglio polizza #' + id, 'info'); }
-function handleRinnovo(id) { toast('Avvio rinnovo polizza #' + id, 'info'); }
-function exportDatabase() { toast('Export database...', 'info'); }
+// === DETAIL MODALS ===
+function viewCliente(id) {
+    var cli = cache.clienti.find(function(c) { return c.id === id; });
+    if (!cli) { toast('Cliente non trovato', 'error'); return; }
+    var cliPol = cache.polizze.filter(function(p) { return p.cliente_id === id; });
+    var cliSin = cache.sinistri.filter(function(s) { return s.cliente_id === id; });
+    var attive = cliPol.filter(function(p) { return p.stato === 'attiva'; });
+    var totPremi = attive.reduce(function(s, p) { return s + (p.premio_lordo || 0); }, 0);
+
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">' +
+        '<div><strong>Nome:</strong> ' + esc(clienteName(cli)) + '</div>' +
+        '<div><strong>CF:</strong> ' + esc(cli.codice_fiscale || '-') + '</div>' +
+        '<div><strong>P.IVA:</strong> ' + esc(cli.partita_iva || '-') + '</div>' +
+        '<div><strong>Email:</strong> ' + esc(cli.email || '-') + '</div>' +
+        '<div><strong>Cellulare:</strong> ' + esc(cli.cellulare || '-') + '</div>' +
+        '<div><strong>Telefono:</strong> ' + esc(cli.telefono || '-') + '</div>' +
+        '<div><strong>Indirizzo:</strong> ' + esc([cli.indirizzo, cli.cap, cli.citta, cli.provincia].filter(Boolean).join(', ') || '-') + '</div>' +
+        '<div><strong>Data nascita:</strong> ' + formatDate(cli.data_nascita) + '</div>' +
+        '<div><strong>Collaboratore:</strong> ' + (cli.collaboratori ? esc(cli.collaboratori.cognome + ' ' + cli.collaboratori.nome) : '-') + '</div>' +
+        '<div><strong>Note:</strong> ' + esc(cli.note || '-') + '</div>' +
+        '</div>';
+
+    // KPI
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:bold;color:var(--fim-accent);">' + attive.length + '</div><div style="font-size:11px;color:var(--fim-text-light);">Polizze Attive</div></div>' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:bold;color:var(--fim-navy);">' + formatCurrency(totPremi) + '</div><div style="font-size:11px;color:var(--fim-text-light);">Premi Totali</div></div>' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:bold;color:#EF4444;">' + cliSin.length + '</div><div style="font-size:11px;color:var(--fim-text-light);">Sinistri</div></div>' +
+        '</div>';
+
+    // Polizze table
+    html += '<h4 style="color:var(--fim-navy);margin-bottom:8px;">Polizze (' + cliPol.length + ')</h4>';
+    if (cliPol.length > 0) {
+        html += '<table class="data-table" style="font-size:12px;"><thead><tr><th>N. Polizza</th><th>Compagnia</th><th>Ramo</th><th>Scadenza</th><th>Premio</th><th>Stato</th></tr></thead><tbody>';
+        cliPol.forEach(function(p) {
+            var sb = { 'attiva': 'badge-success', 'scaduta': 'badge-danger', 'annullata': 'badge-default', 'in_rinnovo': 'badge-warning' };
+            html += '<tr style="cursor:pointer" onclick="closeDetailModal();viewPolizza(' + p.id + ')"><td><strong>' + esc(p.numero_polizza) + '</strong></td><td>' + esc(p.compagnie ? p.compagnie.nome : '-') + '</td><td>' + esc(p.rami_assicurativi ? p.rami_assicurativi.nome : '-') + '</td><td>' + formatDate(p.data_scadenza) + '</td><td>' + formatCurrency(p.premio_lordo) + '</td><td><span class="badge ' + (sb[p.stato] || 'badge-default') + '">' + esc(p.stato) + '</span></td></tr>';
+        });
+        html += '</tbody></table>';
+    } else {
+        html += '<p style="color:var(--fim-text-light);">Nessuna polizza</p>';
+    }
+
+    // Sinistri
+    if (cliSin.length > 0) {
+        html += '<h4 style="color:#EF4444;margin-top:16px;margin-bottom:8px;">Sinistri (' + cliSin.length + ')</h4>';
+        html += '<table class="data-table" style="font-size:12px;"><thead><tr><th>N. Sinistro</th><th>Data</th><th>Tipo</th><th>Riserva</th><th>Stato</th></tr></thead><tbody>';
+        cliSin.forEach(function(s) {
+            html += '<tr><td>' + esc(s.numero_sinistro || '-') + '</td><td>' + formatDate(s.data_evento) + '</td><td>' + esc(s.tipo_sinistro || '-') + '</td><td>' + formatCurrency(s.riserva) + '</td><td>' + esc(s.stato || '-') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+    }
+
+    openDetailModal('Cliente: ' + clienteName(cli), html);
+}
+
+function viewPolizza(id) {
+    var pol = cache.polizze.find(function(p) { return p.id === id; });
+    if (!pol) { toast('Polizza non trovata', 'error'); return; }
+    var cli = cache.clienti.find(function(c) { return c.id === pol.cliente_id; });
+    var polSin = cache.sinistri.filter(function(s) { return s.polizza_id === id; });
+    var det = pol.dettagli_ramo || {};
+    var sb = { 'attiva': 'badge-success', 'scaduta': 'badge-danger', 'annullata': 'badge-default', 'in_rinnovo': 'badge-warning', 'sospesa': 'badge-info', 'disdettata': 'badge-danger' };
+
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+        '<span class="badge ' + (sb[pol.stato] || 'badge-default') + '" style="font-size:13px;padding:6px 14px;">' + esc(pol.stato || '-').toUpperCase() + '</span>' +
+        '<span style="font-size:12px;color:var(--fim-text-light);">ID: ' + pol.id + '</span>' +
+        '</div>';
+
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;font-size:13px;">' +
+        '<div><strong>N. Polizza:</strong> ' + esc(pol.numero_polizza) + '</div>' +
+        '<div><strong>Cliente:</strong> <a href="#" onclick="closeDetailModal();viewCliente(' + pol.cliente_id + ');return false;" style="color:var(--fim-accent);">' + esc(cli ? clienteName(cli) : '-') + '</a></div>' +
+        '<div><strong>Compagnia:</strong> ' + esc(pol.compagnie ? pol.compagnie.nome : '-') + '</div>' +
+        '<div><strong>Ramo:</strong> ' + esc(pol.rami_assicurativi ? pol.rami_assicurativi.nome : '-') + '</div>' +
+        '<div><strong>Collaboratore:</strong> ' + (pol.collaboratori ? esc(pol.collaboratori.cognome + ' ' + pol.collaboratori.nome) : '-') + '</div>' +
+        '<div><strong>Frazionamento:</strong> ' + esc(pol.frazionamento || '-') + '</div>' +
+        '<div><strong>Tacito rinnovo:</strong> ' + (pol.tacito_rinnovo ? 'Sì' : 'No') + '</div>' +
+        '<div><strong>Tipo emissione:</strong> ' + esc(pol.tipo_emissione || '-') + '</div>' +
+        '</div>';
+
+    // Date
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--fim-text-light);">Emissione</div><div style="font-weight:bold;">' + formatDate(pol.data_emissione) + '</div></div>' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--fim-text-light);">Effetto</div><div style="font-weight:bold;">' + formatDate(pol.data_effetto) + '</div></div>' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--fim-text-light);">Scadenza</div><div style="font-weight:bold;color:#EF4444;">' + formatDate(pol.data_scadenza) + '</div></div>' +
+        '</div>';
+
+    // Premi
+    html += '<h4 style="color:var(--fim-navy);margin-bottom:8px;">Dettaglio Premi</h4>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:18px;font-weight:bold;color:var(--fim-accent);">' + formatCurrency(pol.premio_lordo) + '</div><div style="font-size:11px;">Premio Lordo</div></div>' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:16px;font-weight:bold;">' + formatCurrency(pol.imponibile) + '</div><div style="font-size:11px;">Imponibile</div></div>' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:16px;font-weight:bold;">' + formatCurrency(pol.imposte) + '</div><div style="font-size:11px;">Imposte</div></div>' +
+        '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;text-align:center;"><div style="font-size:16px;font-weight:bold;">' + formatCurrency(pol.ssn) + '</div><div style="font-size:11px;">SSN</div></div>' +
+        '</div>';
+
+    // Provvigioni
+    if (pol.perc_provvigione || pol.provvigione) {
+        html += '<h4 style="color:var(--fim-navy);margin-bottom:8px;">Provvigioni</h4>';
+        var imp = pol.imponibile || pol.premio_lordo || 0;
+        var provv = pol.provvigione || (imp * (pol.perc_provvigione || 0) / 100);
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">' +
+            '<div style="background:#f0fdf4;border-radius:8px;padding:12px;text-align:center;"><div style="font-weight:bold;">' + (pol.perc_provvigione || 0) + '%</div><div style="font-size:11px;">% Provvigione</div></div>' +
+            '<div style="background:#f0fdf4;border-radius:8px;padding:12px;text-align:center;"><div style="font-weight:bold;color:var(--fim-accent);">' + formatCurrency(provv) + '</div><div style="font-size:11px;">Provvigione</div></div>' +
+            '<div style="background:#fef3c7;border-radius:8px;padding:12px;text-align:center;"><div style="font-weight:bold;">' + (pol.perc_provv_subagente || 0) + '% — ' + formatCurrency(pol.provv_subagente || 0) + '</div><div style="font-size:11px;">Sub-agente</div></div>' +
+            '</div>';
+    }
+
+    // Dettagli ramo (JSON)
+    if (Object.keys(det).length > 0) {
+        html += '<h4 style="color:var(--fim-navy);margin-bottom:8px;">Dettagli Ramo</h4>';
+        html += '<div style="background:var(--fim-bg);border-radius:8px;padding:12px;font-size:12px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
+        Object.entries(det).forEach(function(e) {
+            if (e[1] !== null && e[1] !== '') {
+                html += '<div><strong>' + esc(e[0].replace(/_/g, ' ')) + ':</strong> ' + esc(String(e[1])) + '</div>';
+            }
+        });
+        html += '</div>';
+    }
+
+    // Note
+    if (pol.note) {
+        html += '<div style="margin-top:12px;padding:10px;background:#fef9c3;border-radius:8px;font-size:12px;"><strong>Note:</strong> ' + esc(pol.note) + '</div>';
+    }
+
+    // Sinistri
+    if (polSin.length > 0) {
+        html += '<h4 style="color:#EF4444;margin-top:16px;margin-bottom:8px;">Sinistri (' + polSin.length + ')</h4>';
+        html += '<table class="data-table" style="font-size:12px;"><thead><tr><th>N. Sinistro</th><th>Data</th><th>Tipo</th><th>Riserva</th><th>Stato</th></tr></thead><tbody>';
+        polSin.forEach(function(s) {
+            html += '<tr><td>' + esc(s.numero_sinistro || '-') + '</td><td>' + formatDate(s.data_evento) + '</td><td>' + esc(s.tipo_sinistro || '-') + '</td><td>' + formatCurrency(s.riserva) + '</td><td>' + esc(s.stato || '-') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+    }
+
+    openDetailModal('Polizza: ' + pol.numero_polizza, html);
+}
+
+function handleRinnovo(id) {
+    var pol = cache.polizze.find(function(p) { return p.id === id; });
+    if (pol) viewPolizza(id);
+    else toast('Polizza non trovata', 'error');
+}
+
+function openDetailModal(title, bodyHtml) {
+    closeDetailModal();
+    var modal = document.createElement('div');
+    modal.id = 'modalDetail';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.onclick = function(e) { if (e.target === modal) closeDetailModal(); };
+    modal.innerHTML = '<div style="background:var(--fim-card);border-radius:12px;max-width:800px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
+        '<div style="padding:16px 20px;border-bottom:1px solid var(--fim-border);display:flex;justify-content:space-between;align-items:center;">' +
+        '<h3 style="color:var(--fim-navy);font-size:16px;margin:0;">' + title + '</h3>' +
+        '<button class="btn btn-secondary btn-sm" onclick="closeDetailModal()">✕</button>' +
+        '</div>' +
+        '<div style="padding:20px;overflow-y:auto;">' + bodyHtml + '</div>' +
+        '</div>';
+    document.body.appendChild(modal);
+}
+
+function closeDetailModal() {
+    var m = document.getElementById('modalDetail');
+    if (m) m.remove();
+}
+
+// === EXPORT DATABASE ===
+function exportDatabase() {
+    if (!cache.clienti || cache.clienti.length === 0) { toast('Nessun dato da esportare', 'error'); return; }
+    var existing = document.getElementById('modalExport');
+    if (existing) existing.remove();
+
+    var modal = document.createElement('div');
+    modal.id = 'modalExport';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = '<div style="background:var(--fim-card);border-radius:12px;padding:24px;max-width:400px;width:90%;">' +
+        '<h3 style="margin-bottom:16px;color:var(--fim-navy)">Export Database</h3>' +
+        '<p style="font-size:13px;color:var(--fim-text-light);margin-bottom:16px;">Seleziona cosa esportare in formato CSV:</p>' +
+        '<div style="display:flex;flex-direction:column;gap:8px;">' +
+        '<button class="btn btn-primary" onclick="exportCSV(\'clienti\')">👥 Clienti (' + cache.clienti.length + ')</button>' +
+        '<button class="btn btn-primary" onclick="exportCSV(\'polizze\')">📋 Polizze (' + cache.polizze.length + ')</button>' +
+        '<button class="btn btn-primary" onclick="exportCSV(\'sinistri\')">⚠️ Sinistri (' + cache.sinistri.length + ')</button>' +
+        '<button class="btn btn-primary" onclick="exportCSV(\'collaboratori\')">🤝 Collaboratori (' + cache.collaboratori.length + ')</button>' +
+        '<button class="btn btn-secondary" style="margin-top:8px;" onclick="document.getElementById(\'modalExport\').remove()">Chiudi</button>' +
+        '</div></div>';
+    document.body.appendChild(modal);
+}
+
+function exportCSV(type) {
+    var rows = [];
+    var filename = 'FIM_' + type + '_' + new Date().toISOString().slice(0, 10) + '.csv';
+
+    if (type === 'clienti') {
+        rows.push(['ID', 'Cognome', 'Nome', 'Ragione Sociale', 'Codice Fiscale', 'P.IVA', 'Email', 'Cellulare', 'Telefono', 'Indirizzo', 'CAP', 'Città', 'Provincia', 'Data Nascita', 'Note']);
+        cache.clienti.forEach(function(c) {
+            rows.push([c.id, c.cognome || '', c.nome || '', c.ragione_sociale || '', c.codice_fiscale || '', c.partita_iva || '', c.email || '', c.cellulare || '', c.telefono || '', c.indirizzo || '', c.cap || '', c.citta || '', c.provincia || '', c.data_nascita || '', c.note || '']);
+        });
+    } else if (type === 'polizze') {
+        rows.push(['ID', 'N. Polizza', 'Cliente', 'Compagnia', 'Ramo', 'Collaboratore', 'Data Effetto', 'Data Scadenza', 'Premio Lordo', 'Imponibile', 'Imposte', 'SSN', '% Provvigione', 'Provvigione', 'Frazionamento', 'Stato', 'Tacito Rinnovo', 'Note']);
+        cache.polizze.forEach(function(p) {
+            rows.push([p.id, p.numero_polizza || '', clienteName(p.clienti), p.compagnie ? p.compagnie.nome : '', p.rami_assicurativi ? p.rami_assicurativi.nome : '', p.collaboratori ? (p.collaboratori.cognome + ' ' + p.collaboratori.nome) : '', p.data_effetto || '', p.data_scadenza || '', p.premio_lordo || 0, p.imponibile || 0, p.imposte || 0, p.ssn || 0, p.perc_provvigione || 0, p.provvigione || 0, p.frazionamento || '', p.stato || '', p.tacito_rinnovo ? 'Sì' : 'No', p.note || '']);
+        });
+    } else if (type === 'sinistri') {
+        rows.push(['ID', 'N. Sinistro', 'Cliente', 'Polizza', 'Data Evento', 'Tipo', 'Riserva', 'Stato', 'Note']);
+        cache.sinistri.forEach(function(s) {
+            rows.push([s.id, s.numero_sinistro || '', clienteName(s.clienti), s.polizze ? s.polizze.numero_polizza : '', s.data_evento || '', s.tipo_sinistro || '', s.riserva || 0, s.stato || '', s.note || '']);
+        });
+    } else if (type === 'collaboratori') {
+        rows.push(['ID', 'Cognome', 'Nome', 'Codice Fiscale', 'Email', 'Telefono', 'RUI', '% Provvigione Default', 'Attivo']);
+        cache.collaboratori.forEach(function(c) {
+            rows.push([c.id, c.cognome || '', c.nome || '', c.codice_fiscale || '', c.email || '', c.telefono || '', c.numero_rui || '', c.perc_provv_default || 0, c.attivo ? 'Sì' : 'No']);
+        });
+    }
+
+    // Build CSV with BOM for Excel compatibility
+    var csvContent = '\uFEFF' + rows.map(function(row) {
+        return row.map(function(cell) {
+            var str = String(cell).replace(/"/g, '""');
+            return '"' + str + '"';
+        }).join(';');
+    }).join('\n');
+
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Export ' + type + ' scaricato: ' + filename, 'success');
+}
+
 function showDbStats() {
-    toast(`DB: ${cache.clienti.length} clienti, ${cache.polizze.length} polizze, ${cache.sinistri.length} sinistri`, 'info');
+    toast('DB: ' + cache.clienti.length + ' clienti, ' + cache.polizze.length + ' polizze, ' + cache.sinistri.length + ' sinistri, ' + cache.collaboratori.length + ' collaboratori', 'info');
 }
 
 // ============================================================
