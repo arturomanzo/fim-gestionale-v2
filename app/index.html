@@ -1797,6 +1797,9 @@ function navigateTo(page) {
 
     // Close sidebar on mobile
     document.getElementById('sidebar').classList.remove('open');
+
+    // Init provvigioni when navigating to that page
+    if (page === 'provvigioni') initProvvigioni();
 }
 
 function toggleSidebar() {
@@ -1821,6 +1824,7 @@ async function refreshAll() {
         ]);
         renderDashboard();
         renderScadenzario();
+        initProvvigioni();
         toast('Dati aggiornati', 'success');
     } catch (err) {
         toast('Errore caricamento: ' + err.message, 'error');
@@ -2401,39 +2405,110 @@ function generateReport(type) {
 }
 
 // === PROVVIGIONI ===
-async function loadProvvigioni() {
-    const periodo = document.getElementById('provvPeriodo')?.value;
-    const collabId = document.getElementById('provvCollab')?.value;
-    if (!sbClient || !periodo) return;
+function initProvvigioni() {
+    // Populate period dropdown with last 12 months
+    var sel = document.getElementById('provvPeriodo');
+    if (!sel) return;
+    sel.innerHTML = '';
+    var now = new Date();
+    for (var i = 0; i < 12; i++) {
+        var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        var val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        var label = d.toLocaleString('it-IT', { month: 'long', year: 'numeric' });
+        sel.innerHTML += '<option value="' + val + '">' + label.charAt(0).toUpperCase() + label.slice(1) + '</option>';
+    }
+    sel.innerHTML += '<option value="all">Tutto il periodo</option>';
 
-    let query = sbClient.from('provvigioni_log')
-        .select('*, collaboratori(cognome, nome), polizze(numero_polizza)')
-        .eq('periodo', periodo);
+    // Populate collaboratori dropdown
+    var collSel = document.getElementById('provvCollab');
+    if (collSel && cache.collaboratori) {
+        collSel.innerHTML = '<option value="">Tutti i collaboratori</option>' +
+            cache.collaboratori.map(function(c) {
+                return '<option value="' + c.id + '">' + (c.cognome || '') + ' ' + (c.nome || '') + '</option>';
+            }).join('');
+    }
+    loadProvvigioni();
+}
+
+async function loadProvvigioni() {
+    var periodo = document.getElementById('provvPeriodo') ? document.getElementById('provvPeriodo').value : '';
+    var collabId = document.getElementById('provvCollab') ? document.getElementById('provvCollab').value : '';
+    if (!sbClient) return;
+
+    // Load polizze with collaboratore data — provvigioni are calculated from polizze fields
+    var query = sbClient.from('polizze')
+        .select('id, numero_polizza, collaboratore_id, cliente_id, premio_lordo, imponibile, perc_provvigione, provvigione, perc_provv_subagente, provv_subagente, data_effetto, data_scadenza, stato, collaboratori(cognome, nome, perc_provv_default), clienti(cognome, nome, ragione_sociale), compagnie(nome)')
+        .is('eliminato_il', null)
+        .not('collaboratore_id', 'is', null);
+
     if (collabId) query = query.eq('collaboratore_id', parseInt(collabId));
 
-    const { data } = await query.order('creato_il', { ascending: false });
-    cache.provvigioni = data || [];
+    // Filter by period (month)
+    if (periodo && periodo !== 'all') {
+        var parts = periodo.split('-');
+        var year = parseInt(parts[0]);
+        var month = parseInt(parts[1]);
+        var startDate = year + '-' + String(month).padStart(2, '0') + '-01';
+        var endMonth = month === 12 ? 1 : month + 1;
+        var endYear = month === 12 ? year + 1 : year;
+        var endDate = endYear + '-' + String(endMonth).padStart(2, '0') + '-01';
+        query = query.gte('data_effetto', startDate).lt('data_effetto', endDate);
+    }
 
-    const tot = data?.reduce((s, p) => s + (p.importo || 0), 0) || 0;
+    var { data, error } = await query.order('data_effetto', { ascending: false });
+    if (error) { toast('Errore caricamento provvigioni: ' + error.message, 'error'); return; }
+
+    // Calculate provvigioni for each polizza
+    var rows = (data || []).map(function(p) {
+        var imp = p.imponibile || p.premio_lordo || 0;
+        var perc = p.perc_provvigione || (p.collaboratori ? p.collaboratori.perc_provv_default : 0) || 0;
+        var provv = p.provvigione || (imp * perc / 100);
+        var collName = p.collaboratori ? ((p.collaboratori.cognome || '') + ' ' + (p.collaboratori.nome || '')).trim() : '-';
+        var cliName = p.clienti ? (p.clienti.ragione_sociale || ((p.clienti.cognome || '') + ' ' + (p.clienti.nome || '')).trim()) : '-';
+        var compName = p.compagnie ? p.compagnie.nome : '-';
+        return {
+            collaboratore: collName,
+            polizza: p.numero_polizza || '-',
+            cliente: cliName,
+            compagnia: compName,
+            imponibile: imp,
+            percentuale: perc,
+            provvigione: provv,
+            data: p.data_effetto || '',
+            stato: p.stato || 'attiva'
+        };
+    });
+
+    var tot = rows.reduce(function(s, r) { return s + r.provvigione; }, 0);
     document.getElementById('provvTotale').textContent = formatCurrency(tot);
-    document.getElementById('provvPolizze').textContent = data?.length || 0;
-    document.getElementById('provvMedia').textContent = formatCurrency(data?.length ? tot / data.length : 0);
+    document.getElementById('provvPolizze').textContent = rows.length;
+    document.getElementById('provvMedia').textContent = formatCurrency(rows.length ? tot / rows.length : 0);
 
-    document.getElementById('provvigioniBody').innerHTML = (data || []).map(p =>
-        `<tr>
-            <td>${p.collaboratori ? esc(p.collaboratori.cognome + ' ' + p.collaboratori.nome) : '-'}</td>
-            <td>${p.polizze ? esc(p.polizze.numero_polizza) : '-'}</td>
-            <td>${formatCurrency(p.imponibile)}</td>
-            <td>${p.percentuale}%</td>
-            <td><strong>${formatCurrency(p.importo)}</strong></td>
-            <td>${p.periodo}</td>
-            <td><span class="badge badge-info">${p.tipo}</span></td>
-        </tr>`
-    ).join('');
+    document.getElementById('provvigioniBody').innerHTML = rows.length === 0 ?
+        '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--fim-text-light)">Nessuna provvigione nel periodo selezionato</td></tr>' :
+        rows.map(function(r) {
+            return '<tr>' +
+                '<td>' + esc(r.collaboratore) + '</td>' +
+                '<td><strong>' + esc(r.polizza) + '</strong><br><span style="font-size:11px;color:var(--fim-text-light)">' + esc(r.cliente) + '</span></td>' +
+                '<td>' + formatCurrency(r.imponibile) + '</td>' +
+                '<td>' + r.percentuale + '%</td>' +
+                '<td><strong style="color:var(--fim-accent)">' + formatCurrency(r.provvigione) + '</strong></td>' +
+                '<td>' + formatDate(r.data) + '</td>' +
+                '<td><span class="badge badge-' + (r.stato === 'attiva' ? 'success' : 'warning') + '">' + esc(r.stato) + '</span></td>' +
+            '</tr>';
+        }).join('');
 }
 
 function exportProvvigioni() {
-    toast('Export CSV provvigioni...', 'info');
+    if (!cache.provvigioni || cache.provvigioni.length === 0) {
+        // Use table data instead
+        var rows = document.querySelectorAll('#provvigioniBody tr');
+        if (rows.length === 0 || (rows.length === 1 && rows[0].cells.length === 1)) {
+            toast('Nessun dato da esportare', 'error');
+            return;
+        }
+    }
+    toast('Export CSV provvigioni in sviluppo...', 'info');
 }
 
 // === PLACEHOLDER FUNCTIONS ===
